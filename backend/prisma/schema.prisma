@@ -1,0 +1,284 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  WARDEN
+  MESS_ADMIN
+  SUPER_ADMIN
+}
+
+enum StudentState {
+  INSIDE
+  OUTSIDE
+}
+
+enum DevicePurpose {
+  GATE
+  MESS
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SNACKS
+  DINNER
+}
+
+enum QrTokenStatus {
+  UNUSED
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum AttendanceDirection {
+  ENTRY
+  EXIT
+}
+
+enum ActorType {
+  USER
+  DEVICE
+  SYSTEM
+}
+
+model User {
+  id            String         @id @default(uuid())
+  name          String         @db.VarChar(120)
+  email         String         @unique @db.VarChar(255)
+  password_hash String         @db.VarChar(255)
+  role          Role
+  is_active     Boolean        @default(true)
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+
+  student            Student?
+  warden_hostels     Hostel[]       @relation("WardenHostels")
+  mess_admin_messes  Mess[]         @relation("MessAdminMesses")
+  registered_devices Device[]       @relation("UserRegisteredDevices")
+  refresh_tokens     RefreshToken[]
+
+  @@map("users")
+}
+
+model Student {
+  id            String       @id @default(uuid())
+  user_id       String       @unique
+  user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  roll_number   String       @unique @db.VarChar(30)
+  hostel_id     String
+  hostel        Hostel       @relation(fields: [hostel_id], references: [id])
+  room_id       String
+  room          Room         @relation(fields: [room_id], references: [id])
+  photo_url     String?      @db.VarChar(512)
+  current_state StudentState @default(INSIDE)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  hostel_attendance HostelAttendance[]
+  mess_attendance   MessAttendance[]
+
+  @@map("students")
+}
+
+model Hostel {
+  id             String   @id @default(uuid())
+  name           String   @unique @db.VarChar(120)
+  location       String   @db.VarChar(255)
+  total_capacity Int
+  warden_id      String?
+  warden         User?    @relation("WardenHostels", fields: [warden_id], references: [id], onDelete: SetNull)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  rooms             Room[]
+  gates             Gate[]
+  students          Student[]
+  messes            Mess[]
+  hostel_attendance HostelAttendance[]
+
+  @@map("hostels")
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  hostel_id   String
+  hostel      Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  room_number String   @db.VarChar(20)
+  capacity    Int
+  created_at  DateTime @default(now())
+
+  students Student[]
+
+  @@unique([hostel_id, room_number])
+  @@map("rooms")
+}
+
+model Gate {
+  id         String   @id @default(uuid())
+  hostel_id  String
+  hostel     Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  name       String   @db.VarChar(80)
+  created_at DateTime @default(now())
+
+  devices           Device[]
+  qr_tokens         QrToken[]
+  hostel_attendance HostelAttendance[]
+
+  @@map("gates")
+}
+
+model Device {
+  id                String        @id @default(uuid())
+  device_name       String        @db.VarChar(120)
+  purpose           DevicePurpose
+  gate_id           String?
+  gate              Gate?         @relation(fields: [gate_id], references: [id], onDelete: SetNull)
+  mess_id           String?
+  mess              Mess?         @relation(fields: [mess_id], references: [id], onDelete: SetNull)
+  secret_hash       String        @db.VarChar(255)
+  is_active         Boolean       @default(true)
+  last_heartbeat_at DateTime?
+  registered_by     String
+  registrant        User          @relation("UserRegisteredDevices", fields: [registered_by], references: [id])
+  created_at        DateTime      @default(now())
+
+  qr_tokens         QrToken[]
+  hostel_attendance HostelAttendance[]
+  mess_attendance   MessAttendance[]
+
+  @@map("devices")
+}
+
+model Mess {
+  id            String   @id @default(uuid())
+  name          String   @unique @db.VarChar(120)
+  hostel_id     String?
+  hostel        Hostel?  @relation(fields: [hostel_id], references: [id], onDelete: SetNull)
+  mess_admin_id String?
+  mess_admin    User?    @relation("MessAdminMesses", fields: [mess_admin_id], references: [id], onDelete: SetNull)
+  created_at    DateTime @default(now())
+
+  meal_windows    MealWindow[]
+  devices         Device[]
+  qr_tokens       QrToken[]
+  mess_attendance MessAttendance[]
+
+  @@map("messes")
+}
+
+model MealWindow {
+  id         String   @id @default(uuid())
+  mess_id    String
+  mess       Mess     @relation(fields: [mess_id], references: [id], onDelete: Cascade)
+  meal_type  MealType
+  start_time String   @db.VarChar(8)
+  end_time   String   @db.VarChar(8)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  qr_tokens       QrToken[]
+  mess_attendance MessAttendance[]
+
+  @@map("meal_windows")
+}
+
+model QrToken {
+  id             String        @id @default(uuid())
+  token_hash     String        @unique @db.VarChar(255)
+  device_id      String
+  device         Device        @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  purpose        DevicePurpose
+  gate_id        String?
+  gate           Gate?         @relation(fields: [gate_id], references: [id], onDelete: SetNull)
+  mess_id        String?
+  mess           Mess?         @relation(fields: [mess_id], references: [id], onDelete: SetNull)
+  meal_window_id String?
+  meal_window    MealWindow?   @relation(fields: [meal_window_id], references: [id], onDelete: SetNull)
+  status         QrTokenStatus @default(UNUSED)
+  expires_at     DateTime
+  created_at     DateTime      @default(now())
+  used_at        DateTime?
+
+  hostel_attendance HostelAttendance[]
+  mess_attendance   MessAttendance[]
+
+  @@index([expires_at, status])
+  @@map("qr_tokens")
+}
+
+model HostelAttendance {
+  id          String              @id @default(uuid())
+  student_id  String
+  student     Student             @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  hostel_id   String
+  hostel      Hostel              @relation(fields: [hostel_id], references: [id])
+  gate_id     String
+  gate        Gate                @relation(fields: [gate_id], references: [id])
+  device_id   String
+  device      Device              @relation(fields: [device_id], references: [id])
+  direction   AttendanceDirection
+  scanned_at  DateTime            @default(now())
+  qr_token_id String
+  qr_token    QrToken             @relation(fields: [qr_token_id], references: [id])
+
+  @@index([student_id, scanned_at])
+  @@index([hostel_id, scanned_at])
+  @@map("hostel_attendance")
+}
+
+model MessAttendance {
+  id             String     @id @default(uuid())
+  student_id     String
+  student        Student    @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  mess_id        String
+  mess           Mess       @relation(fields: [mess_id], references: [id])
+  meal_window_id String
+  meal_window    MealWindow @relation(fields: [meal_window_id], references: [id])
+  device_id      String
+  device         Device     @relation(fields: [device_id], references: [id])
+  meal_type      MealType
+  date           DateTime   @db.Date
+  scanned_at     DateTime   @default(now())
+  qr_token_id    String
+  qr_token       QrToken    @relation(fields: [qr_token_id], references: [id])
+
+  @@unique([student_id, meal_window_id, date])
+  @@index([student_id])
+  @@index([mess_id, date, meal_type])
+  @@map("mess_attendance")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token_hash String    @unique @db.VarChar(255)
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  actor_id    String?
+  actor_type  ActorType
+  action      String    @db.VarChar(120)
+  target_type String?   @db.VarChar(60)
+  target_id   String?
+  meta        Json?
+  created_at  DateTime  @default(now())
+
+  @@index([created_at])
+  @@map("audit_logs")
+}

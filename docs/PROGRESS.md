@@ -9,21 +9,21 @@
 
 ## Current Phase
 
-**Phase 2 — Authentication**
+**Phase 3 — Device Authentication**
 
 ---
 
 ## Last Completed Step
 
-**1.9 React shell** — `App.tsx` sets up `react-router-dom` with placeholder routes for all client interfaces (`/app/*`, `/display/gate/:deviceId`, `/display/mess/:deviceId`, `/dashboard/*`) with navigation and responsive dark UI. (Phase 1 Complete)
+**Phase 2 Complete (2.1 - 2.9)** — User login, JWT access (15m) + rotating refresh (7d), single-use reuse breach detection, RBAC middleware, IP rate limiting, audit logging on auth events, and React frontend login flow with auto-refresh Axios interceptor.
 
 ---
 
 ## Next Step
 
-**2.1 User login endpoint** — `POST /api/auth/login` accepts `{ email, password }`, verifies bcrypt hash, returns `{ accessToken, refreshToken, user }`. Returns 401 on bad credentials.
+**3.1 Device registration endpoint** — `POST /api/devices/register` (SUPER_ADMIN); creates `devices` row, generates 32-byte random secret, returns plaintext secret once; stores bcrypt hash in `secret_hash`.
 
-Reference: `FEATURES.md` checkbox 2.1
+Reference: `FEATURES.md` checkbox 3.1
 
 ---
 
@@ -40,6 +40,7 @@ Reference: `FEATURES.md` checkbox 2.1
 - **QR tokens are opaque** — only SHA-256 hash stored server-side; no identity embedded.
 - **Device auth is separate from user auth** — devices use a per-device bcrypt-hashed
   secret, not JWTs.
+- **2026-09-19** — MANIT Specific Hostel Configuration: Added `HostelType` enum (`BOYS`, `GIRLS`) to `Hostel` model. Configured MANIT Hostels 1 through 12, where Hostels 7 and 12 are designated as Girls Hostels and Hostels 1–6 and 8–11 are Boys Hostels. Seed script and MySQL database updated and migrated.
 
 ---
 

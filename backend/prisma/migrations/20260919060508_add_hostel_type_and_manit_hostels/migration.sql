@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `hostels` ADD COLUMN `type` ENUM('BOYS', 'GIRLS') NOT NULL DEFAULT 'BOYS';

@@ -28,15 +28,15 @@
 > **Done means**: a user can log in, receive access + refresh tokens, use the access token
 > to call a protected endpoint, and rotate tokens via refresh. All RBAC roles are enforced.
 
-- [ ] **2.1 User login endpoint** — `POST /api/auth/login` accepts `{ email, password }`, verifies bcrypt hash, returns `{ accessToken, refreshToken, user }`. Returns 401 on bad credentials.
-- [ ] **2.2 JWT access token** — 15-minute HS256 token with payload `{ sub, role, iat, exp }` signed by `ACCESS_TOKEN_SECRET`. Verified by `authenticate` middleware.
-- [ ] **2.3 Refresh token issuance** — On login, a cryptographically random 32-byte refresh token is generated; its SHA-256 hash is stored in `refresh_tokens` with a 7-day expiry; the raw token is returned to the client.
-- [ ] **2.4 Token refresh endpoint** — `POST /api/auth/refresh` accepts `{ refreshToken }`, validates hash exists and is not revoked/expired, issues new access + refresh pair, revokes old refresh token. Detects reuse (revoked token presented → revoke all user tokens).
-- [ ] **2.5 Logout endpoint** — `POST /api/auth/logout` revokes the current refresh token; requires valid access token.
-- [ ] **2.6 RBAC middleware** — `authorize(roles[])` middleware; attaches decoded user to `req.user`; returns 403 if role not permitted. Applied to all protected routes.
-- [ ] **2.7 Login rate limiting** — `express-rate-limit` on `POST /api/auth/login`: 10 req/min per IP; returns 429 on breach.
-- [ ] **2.8 Frontend auth flow** — Login page (`/login`) with email/password form; stores access token in memory (React context) and refresh token in `httpOnly` cookie or localStorage; `axios` interceptor auto-refreshes on 401; protected route wrapper redirects unauthenticated users to `/login`.
-- [ ] **2.9 Audit log — login/logout** — `USER_LOGIN` and `USER_LOGOUT` entries written to `audit_logs` on each event.
+- [x] **2.1 User login endpoint** — `POST /api/auth/login` accepts `{ email, password }`, verifies bcrypt hash, returns `{ accessToken, refreshToken, user }`. Returns 401 on bad credentials.
+- [x] **2.2 JWT access token** — 15-minute HS256 token with payload `{ sub, role, iat, exp }` signed by `ACCESS_TOKEN_SECRET`. Verified by `authenticate` middleware.
+- [x] **2.3 Refresh token issuance** — On login, a cryptographically random 32-byte refresh token is generated; its SHA-256 hash is stored in `refresh_tokens` with a 7-day expiry; the raw token is returned to the client.
+- [x] **2.4 Token refresh endpoint** — `POST /api/auth/refresh` accepts `{ refreshToken }`, validates hash exists and is not revoked/expired, issues new access + refresh pair, revokes old refresh token. Detects reuse (revoked token presented → revoke all user tokens).
+- [x] **2.5 Logout endpoint** — `POST /api/auth/logout` revokes the current refresh token; requires valid access token.
+- [x] **2.6 RBAC middleware** — `authorize(roles[])` middleware; attaches decoded user to `req.user`; returns 403 if role not permitted. Applied to all protected routes.
+- [x] **2.7 Login rate limiting** — `express-rate-limit` on `POST /api/auth/login`: 10 req/min per IP; returns 429 on breach.
+- [x] **2.8 Frontend auth flow** — Login page (`/login`) with email/password form; stores access token in memory (React context) and refresh token in `httpOnly` cookie or localStorage; `axios` interceptor auto-refreshes on 401; protected route wrapper redirects unauthenticated users to `/login`.
+- [x] **2.9 Audit log — login/logout** — `USER_LOGIN` and `USER_LOGOUT` entries written to `audit_logs` on each event.
 
 ---
 

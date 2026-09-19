@@ -19,6 +19,11 @@ enum StudentState {
   OUTSIDE
 }
 
+enum HostelType {
+  BOYS
+  GIRLS
+}
+
 enum DevicePurpose {
   GATE
   MESS
@@ -89,9 +94,10 @@ model Student {
 }
 
 model Hostel {
-  id             String   @id @default(uuid())
-  name           String   @unique @db.VarChar(120)
-  location       String   @db.VarChar(255)
+  id             String     @id @default(uuid())
+  name           String     @unique @db.VarChar(120)
+  type           HostelType @default(BOYS)
+  location       String     @db.VarChar(255)
   total_capacity Int
   warden_id      String?
   warden         User?    @relation("WardenHostels", fields: [warden_id], references: [id], onDelete: SetNull)

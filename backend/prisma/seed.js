@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding database...');
+  console.log('Seeding MANIT Hostel & Mess Database for HOSTEL360...');
 
   // Common password hash for test accounts: "password123"
   const salt = await bcrypt.genSalt(10);
@@ -15,7 +15,7 @@ async function main() {
     where: { email: 'admin@hostel360.com' },
     update: {},
     create: {
-      name: 'Chief Administrator',
+      name: 'MANIT Chief Administrator',
       email: 'admin@hostel360.com',
       password_hash: commonPasswordHash,
       role: 'SUPER_ADMIN',
@@ -29,7 +29,7 @@ async function main() {
     where: { email: 'warden.h5@hostel360.com' },
     update: {},
     create: {
-      name: 'Dr. Robert Warden',
+      name: 'Dr. R. K. Sharma (Warden)',
       email: 'warden.h5@hostel360.com',
       password_hash: commonPasswordHash,
       role: 'WARDEN',
@@ -42,7 +42,7 @@ async function main() {
     where: { email: 'messadmin@hostel360.com' },
     update: {},
     create: {
-      name: 'Chef Suresh Mess Admin',
+      name: 'S. K. Verma (MANIT Mess Manager)',
       email: 'messadmin@hostel360.com',
       password_hash: commonPasswordHash,
       role: 'MESS_ADMIN',
@@ -50,116 +50,95 @@ async function main() {
     },
   });
 
-  // 4. Hostels
-  const hostel1 = await prisma.hostel.upsert({
-    where: { name: 'H5 Boys Hostel' },
-    update: {},
-    create: {
-      name: 'H5 Boys Hostel',
-      location: 'North Campus, Sector 4',
-      total_capacity: 200,
-      warden_id: wardenUser.id,
-    },
-  });
+  // 4. MANIT Hostels 1 to 12 (7 and 12 are Girls Hostels, rest are Boys)
+  const manitHostelConfigs = [
+    { number: 1, type: 'BOYS', location: 'MANIT West Campus' },
+    { number: 2, type: 'BOYS', location: 'MANIT West Campus' },
+    { number: 3, type: 'BOYS', location: 'MANIT Central Campus' },
+    { number: 4, type: 'BOYS', location: 'MANIT Central Campus' },
+    { number: 5, type: 'BOYS', location: 'MANIT South Campus' },
+    { number: 6, type: 'BOYS', location: 'MANIT South Campus' },
+    { number: 7, type: 'GIRLS', location: 'MANIT Girls Hostel Complex' },
+    { number: 8, type: 'BOYS', location: 'MANIT North Campus' },
+    { number: 9, type: 'BOYS', location: 'MANIT North Campus' },
+    { number: 10, type: 'BOYS', location: 'MANIT PG Block' },
+    { number: 11, type: 'BOYS', location: 'MANIT New Boys Block' },
+    { number: 12, type: 'GIRLS', location: 'MANIT New Girls Block' },
+  ];
 
-  const hostel2 = await prisma.hostel.upsert({
-    where: { name: 'H6 Girls Hostel' },
-    update: {},
-    create: {
-      name: 'H6 Girls Hostel',
-      location: 'South Campus, Sector 2',
-      total_capacity: 150,
-    },
-  });
-  console.log(`Created/Verified Hostels: ${hostel1.name}, ${hostel2.name}`);
+  const hostelRecords = {};
+  const hostelRooms = {};
 
-  // 5. Rooms (4 each)
-  const roomNumbersH5 = ['101', '102', '103', '104'];
-  const roomsH5 = [];
-  for (const rNum of roomNumbersH5) {
-    const room = await prisma.room.upsert({
-      where: {
-        hostel_id_room_number: {
-          hostel_id: hostel1.id,
-          room_number: rNum,
-        },
+  for (const h of manitHostelConfigs) {
+    const hostelName = `Hostel ${h.number}`;
+    const hostel = await prisma.hostel.upsert({
+      where: { name: hostelName },
+      update: {
+        type: h.type,
+        location: h.location,
       },
-      update: {},
       create: {
-        hostel_id: hostel1.id,
-        room_number: rNum,
-        capacity: 2,
+        name: hostelName,
+        type: h.type,
+        location: h.location,
+        total_capacity: 300,
+        warden_id: h.number === 5 ? wardenUser.id : null,
       },
     });
-    roomsH5.push(room);
-  }
 
-  const roomNumbersH6 = ['201', '202', '203', '204'];
-  const roomsH6 = [];
-  for (const rNum of roomNumbersH6) {
-    const room = await prisma.room.upsert({
-      where: {
-        hostel_id_room_number: {
-          hostel_id: hostel2.id,
-          room_number: rNum,
+    hostelRecords[h.number] = hostel;
+
+    // Create 4 rooms for each hostel
+    hostelRooms[h.number] = [];
+    for (const rNum of ['101', '102', '103', '104']) {
+      const room = await prisma.room.upsert({
+        where: {
+          hostel_id_room_number: {
+            hostel_id: hostel.id,
+            room_number: rNum,
+          },
         },
-      },
-      update: {},
-      create: {
-        hostel_id: hostel2.id,
-        room_number: rNum,
-        capacity: 2,
-      },
-    });
-    roomsH6.push(room);
-  }
-  console.log(`Created 4 rooms in H5 and 4 rooms in H6`);
-
-  // 6. Gates (2 each)
-  const gatesH5 = ['Main Gate', 'North Gate'];
-  for (const gName of gatesH5) {
-    const existing = await prisma.gate.findFirst({
-      where: { hostel_id: hostel1.id, name: gName },
-    });
-    if (!existing) {
-      await prisma.gate.create({
-        data: {
-          hostel_id: hostel1.id,
-          name: gName,
+        update: {},
+        create: {
+          hostel_id: hostel.id,
+          room_number: rNum,
+          capacity: 2,
         },
       });
+      hostelRooms[h.number].push(room);
+    }
+
+    // Create 2 gates for each hostel (Main Gate & Back Gate)
+    for (const gName of ['Main Gate', 'Side Gate']) {
+      const existingGate = await prisma.gate.findFirst({
+        where: { hostel_id: hostel.id, name: gName },
+      });
+      if (!existingGate) {
+        await prisma.gate.create({
+          data: {
+            hostel_id: hostel.id,
+            name: gName,
+          },
+        });
+      }
     }
   }
 
-  const gatesH6 = ['Main Gate', 'South Gate'];
-  for (const gName of gatesH6) {
-    const existing = await prisma.gate.findFirst({
-      where: { hostel_id: hostel2.id, name: gName },
-    });
-    if (!existing) {
-      await prisma.gate.create({
-        data: {
-          hostel_id: hostel2.id,
-          name: gName,
-        },
-      });
-    }
-  }
-  console.log(`Created 2 gates in H5 and 2 gates in H6`);
+  console.log(`Created/Verified all 12 MANIT Hostels (Hostel 7 & 12 Girls, Hostels 1-6 & 8-11 Boys) with rooms and gates`);
 
-  // 7. Shared Central Mess
+  // 5. Shared MANIT Central Mess
   const centralMess = await prisma.mess.upsert({
-    where: { name: 'Central Campus Mess' },
+    where: { name: 'MANIT Central Campus Mess' },
     update: {},
     create: {
-      name: 'Central Campus Mess',
+      name: 'MANIT Central Campus Mess',
       hostel_id: null,
       mess_admin_id: messAdminUser.id,
     },
   });
   console.log(`Created/Verified Mess: ${centralMess.name}`);
 
-  // 8. Meal Windows (4 meal types)
+  // 6. Meal Windows (4 meal types)
   const mealWindowsData = [
     { meal_type: 'BREAKFAST', start_time: '07:30', end_time: '09:30' },
     { meal_type: 'LUNCH', start_time: '12:30', end_time: '14:30' },
@@ -183,48 +162,47 @@ async function main() {
       });
     }
   }
-  console.log(`Created 4 meal windows for ${centralMess.name}`);
 
-  // 9. 5 Students with linked Users
+  // 7. Students assigned to MANIT Hostels
   const studentProfiles = [
     {
       name: 'Aarav Sharma',
       email: 'aarav.sharma@student.hostel360.com',
-      roll_number: 'MCA2024001',
-      hostel: hostel1,
-      room: roomsH5[0],
+      roll_number: '232112001',
+      hostelNum: 1, // Boys
+      roomIdx: 0,
       photo_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop&crop=faces',
     },
     {
       name: 'Vivaan Patel',
       email: 'vivaan.patel@student.hostel360.com',
-      roll_number: 'MCA2024002',
-      hostel: hostel1,
-      room: roomsH5[1],
+      roll_number: '232112002',
+      hostelNum: 5, // Boys
+      roomIdx: 1,
       photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=faces',
     },
     {
       name: 'Ananya Verma',
       email: 'ananya.verma@student.hostel360.com',
-      roll_number: 'MCA2024003',
-      hostel: hostel2,
-      room: roomsH6[0],
+      roll_number: '232112003',
+      hostelNum: 7, // Girls
+      roomIdx: 0,
       photo_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=faces',
     },
     {
       name: 'Rohan Gupta',
       email: 'rohan.gupta@student.hostel360.com',
-      roll_number: 'MCA2024004',
-      hostel: hostel1,
-      room: roomsH5[2],
+      roll_number: '232112004',
+      hostelNum: 10, // Boys
+      roomIdx: 2,
       photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=faces',
     },
     {
       name: 'Diya Sen',
       email: 'diya.sen@student.hostel360.com',
-      roll_number: 'MCA2024005',
-      hostel: hostel2,
-      room: roomsH6[1],
+      roll_number: '232112005',
+      hostelNum: 12, // Girls
+      roomIdx: 1,
       photo_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=faces',
     },
   ];
@@ -242,22 +220,29 @@ async function main() {
       },
     });
 
+    const targetHostel = hostelRecords[s.hostelNum];
+    const targetRoom = hostelRooms[s.hostelNum][s.roomIdx];
+
     await prisma.student.upsert({
-      where: { roll_number: s.roll_number },
-      update: {},
+      where: { user_id: user.id },
+      update: {
+        roll_number: s.roll_number,
+        hostel_id: targetHostel.id,
+        room_id: targetRoom.id,
+      },
       create: {
         user_id: user.id,
         roll_number: s.roll_number,
-        hostel_id: s.hostel.id,
-        room_id: s.room.id,
+        hostel_id: targetHostel.id,
+        room_id: targetRoom.id,
         photo_url: s.photo_url,
         current_state: 'INSIDE',
       },
     });
   }
-  console.log(`Created 5 students with linked user accounts (password: password123)`);
 
-  console.log('Seeding completed successfully! 🚀');
+  console.log(`Created 5 MANIT students with linked user accounts assigned to Hostels 1, 5, 7 (Girls), 10, and 12 (Girls)`);
+  console.log('MANIT Database Seeding completed successfully! 🚀');
 }
 
 main()

@@ -41,6 +41,7 @@ Reference: `FEATURES.md` checkbox 3.1
 - **Device auth is separate from user auth** — devices use a per-device bcrypt-hashed
   secret, not JWTs.
 - **2026-09-19** — MANIT Specific Hostel Configuration: Added `HostelType` enum (`BOYS`, `GIRLS`) to `Hostel` model. Configured MANIT Hostels 1 through 12, where Hostels 7 and 12 are designated as Girls Hostels and Hostels 1–6 and 8–11 are Boys Hostels. Seed script and MySQL database updated and migrated.
+- **2026-09-19** — Git Workflow: Always commit and push through `development` branch first, then merge into `main` and push `main`. Working branch remains `development`.
 
 ---
 

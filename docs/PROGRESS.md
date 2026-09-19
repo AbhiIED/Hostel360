@@ -15,15 +15,15 @@
 
 ## Last Completed Step
 
-**Phase 2 Complete (2.1 - 2.9)** — User login, JWT access (15m) + rotating refresh (7d), single-use reuse breach detection, RBAC middleware, IP rate limiting, audit logging on auth events, and React frontend login flow with auto-refresh Axios interceptor.
+**3.1 & 3.2 Device registration & list** — `POST /api/devices/register` (SUPER_ADMIN) generates 32-byte secret and stores bcrypt hash in `secret_hash`, returns secret once; `GET /api/devices` returns device list with gate/mess metadata; RBAC and audit logging verified.
 
 ---
 
 ## Next Step
 
-**3.1 Device registration endpoint** — `POST /api/devices/register` (SUPER_ADMIN); creates `devices` row, generates 32-byte random secret, returns plaintext secret once; stores bcrypt hash in `secret_hash`.
+**3.3 `authenticateDevice` middleware & 3.4 Heartbeat endpoint** — Authenticates device requests using secret header hint; updates `last_heartbeat_at` on heartbeat.
 
-Reference: `FEATURES.md` checkbox 3.1
+Reference: `FEATURES.md` checkboxes 3.3, 3.4
 
 ---
 

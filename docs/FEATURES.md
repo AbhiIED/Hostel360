@@ -45,8 +45,8 @@
 > **Done means**: a Super Admin can register a device and get a one-time secret; the device
 > can authenticate with that secret on every request; disabling a device gives it 401 instantly.
 
-- [ ] **3.1 Device registration endpoint** — `POST /api/devices/register` (SUPER_ADMIN); creates `devices` row, generates 32-byte random secret, returns plaintext secret once (never again); stores bcrypt hash in `secret_hash`.
-- [ ] **3.2 Device list endpoint** — `GET /api/devices` (SUPER_ADMIN); returns all devices with `last_heartbeat_at`, `is_active`, linked gate/mess info.
+- [x] **3.1 Device registration endpoint** — `POST /api/devices/register` (SUPER_ADMIN); creates `devices` row, generates 32-byte random secret, returns plaintext secret once (never again); stores bcrypt hash in `secret_hash`.
+- [x] **3.2 Device list endpoint** — `GET /api/devices` (SUPER_ADMIN); returns all devices with `last_heartbeat_at`, `is_active`, linked gate/mess info.
 - [ ] **3.3 `authenticateDevice` middleware** — Reads `Authorization: Bearer <secret>` header; looks up device by brute-force search (or device-id header hint); verifies bcrypt; checks `is_active`; returns 401 if inactive or secret wrong; attaches `req.device`.
 - [ ] **3.4 Heartbeat endpoint** — `POST /api/devices/heartbeat` (device auth); updates `devices.last_heartbeat_at` to NOW(); returns `{ ok: true }`.
 - [ ] **3.5 Disable device endpoint** — `PATCH /api/devices/:id/disable` (SUPER_ADMIN); sets `is_active = false`; bulk-updates all `UNUSED` QR tokens for that device to `REVOKED`; emits `device:alert` Socket.IO event to `admin:global`.

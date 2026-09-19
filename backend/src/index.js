@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
 import authRoutes from './routes/authRoutes.js';
+import deviceRoutes from './routes/deviceRoutes.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/devices', deviceRoutes);
 
 // Default 404 handler for unmatched API routes
 app.use('/api', (req, res) => {

@@ -3,6 +3,7 @@ import { QrCode, Shield, Utensils, LayoutDashboard, UserCheck, LogOut, LogIn } f
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
+import { DeviceManagementPage } from './pages/DeviceManagementPage';
 
 const Navigation = () => {
   const location = useLocation();
@@ -179,9 +180,17 @@ const DashboardPlaceholder = () => {
         <p className="text-slate-400 text-sm mb-4">
           Logged in as: <span className="text-white font-semibold">{user?.name}</span> (<span className="text-amber-400">{user?.role}</span>)
         </p>
-        <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300">
-          Ready for Phase 3 (Device Auth UI), Phase 4 (Entity CRUD) and Phase 8 (Socket.IO Live Occupancy & Feeds).
+        <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300 mb-6">
+          Ready for Phase 4 (Entity CRUD) and Phase 8 (Socket.IO Live Occupancy & Feeds).
         </div>
+        {user?.role === 'SUPER_ADMIN' && (
+          <Link
+            to="/dashboard/devices"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition"
+          >
+            <span>Manage Hardware Devices (Kiosks)</span>
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -207,6 +216,14 @@ export default function App() {
               />
               <Route path="/display/gate/:deviceId" element={<GateKioskPlaceholder />} />
               <Route path="/display/mess/:deviceId" element={<MessKioskPlaceholder />} />
+              <Route
+                path="/dashboard/devices"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                    <DeviceManagementPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/dashboard/*"
                 element={

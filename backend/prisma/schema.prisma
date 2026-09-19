@@ -14,6 +14,12 @@ enum Role {
   SUPER_ADMIN
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 enum StudentState {
   INSIDE
   OUTSIDE
@@ -22,6 +28,12 @@ enum StudentState {
 enum HostelType {
   BOYS
   GIRLS
+}
+
+enum RoomStatus {
+  ACTIVE
+  MAINTENANCE
+  CLOSED
 }
 
 enum DevicePurpose {
@@ -78,6 +90,9 @@ model Student {
   user_id       String       @unique
   user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   roll_number   String       @unique @db.VarChar(30)
+  gender        Gender       @default(MALE)
+  department    String?      @db.VarChar(50)
+  year          Int?
   hostel_id     String
   hostel        Hostel       @relation(fields: [hostel_id], references: [id])
   room_id       String
@@ -95,14 +110,16 @@ model Student {
 
 model Hostel {
   id             String     @id @default(uuid())
+  code           String     @unique @db.VarChar(10)
   name           String     @unique @db.VarChar(120)
   type           HostelType @default(BOYS)
+  has_blocks     Boolean    @default(false)
   location       String     @db.VarChar(255)
   total_capacity Int
   warden_id      String?
-  warden         User?    @relation("WardenHostels", fields: [warden_id], references: [id], onDelete: SetNull)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  warden         User?      @relation("WardenHostels", fields: [warden_id], references: [id], onDelete: SetNull)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
 
   rooms             Room[]
   gates             Gate[]
@@ -114,12 +131,15 @@ model Hostel {
 }
 
 model Room {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   hostel_id   String
-  hostel      Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
-  room_number String   @db.VarChar(20)
-  capacity    Int
-  created_at  DateTime @default(now())
+  hostel      Hostel     @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  block       String?    @db.VarChar(2)
+  floor       Int        @default(0)
+  room_number String     @unique @db.VarChar(10)
+  capacity    Int        @default(2)
+  status      RoomStatus @default(ACTIVE)
+  created_at  DateTime   @default(now())
 
   students Student[]
 
@@ -143,6 +163,7 @@ model Gate {
 
 model Device {
   id                String        @id @default(uuid())
+  device_code       String?       @unique @db.VarChar(50)
   device_name       String        @db.VarChar(120)
   purpose           DevicePurpose
   gate_id           String?

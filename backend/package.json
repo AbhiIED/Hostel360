@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "test": "node --test tests/**/*.test.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -24,8 +25,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/supertest": "^7.2.1",
     "nodemon": "^3.1.4",
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "supertest": "^7.3.0"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

@@ -126,11 +126,18 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 HOSTEL360 Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  // Start background QR token expiration sweeper
-  startTokenSweeper();
-});
+const isTestEnv =
+  process.env.NODE_ENV === 'test' ||
+  process.execArgv.includes('--test') ||
+  process.argv.some((a) => a.includes('test'));
+
+if (!isTestEnv) {
+  server.listen(PORT, () => {
+    console.log(`🚀 HOSTEL360 Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    // Start background QR token expiration sweeper
+    startTokenSweeper();
+  });
+}
 
 export { app, server, io };

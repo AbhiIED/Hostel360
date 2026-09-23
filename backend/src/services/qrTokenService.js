@@ -21,7 +21,15 @@ export async function getActiveMealWindow(messId, now = new Date()) {
  * @param {object} device - Authenticated device object
  * @returns {Promise<{ token: string, expires_at: Date, ttl: number, record: object }>}
  */
-export async function generateQrToken(device) {
+export async function generateQrToken(deviceOrId) {
+  let device = deviceOrId;
+  if (typeof deviceOrId === 'string') {
+    device = await prisma.device.findUnique({ where: { id: deviceOrId } });
+    if (!device) {
+      throw new Error(`Device with ID ${deviceOrId} not found`);
+    }
+  }
+
   const ttlSeconds = parseInt(process.env.QR_TTL_SECONDS || '20', 10);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);

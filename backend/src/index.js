@@ -6,6 +6,9 @@ import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
 import authRoutes from './routes/authRoutes.js';
 import deviceRoutes from './routes/deviceRoutes.js';
+import hostelRoutes from './routes/hostelRoutes.js';
+import messRoutes from './routes/messRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 
 dotenv.config();
 
@@ -46,6 +49,9 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/hostels', hostelRoutes);
+app.use('/api/messes', messRoutes);
+app.use('/api/students', studentRoutes);
 
 // Default 404 handler for unmatched API routes
 app.use('/api', (req, res) => {

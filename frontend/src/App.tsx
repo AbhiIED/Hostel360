@@ -11,6 +11,7 @@ import { KioskDisplayPage } from './pages/KioskDisplayPage';
 import { StudentAppPage } from './pages/StudentAppPage';
 import { DashboardHubPage } from './pages/DashboardHubPage';
 import { AttendanceHistoryPage } from './pages/AttendanceHistoryPage';
+import { AnalyticsReportsPage } from './pages/AnalyticsReportsPage';
 
 const Navigation = () => {
   const location = useLocation();
@@ -203,6 +204,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
                     <AttendanceHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/analytics"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                    <AnalyticsReportsPage />
                   </ProtectedRoute>
                 }
               />

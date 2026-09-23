@@ -20,6 +20,7 @@ import {
   Radio,
   RefreshCw,
   ChevronRight,
+  TrendingUp,
 } from 'lucide-react';
 
 export const DashboardHubPage: React.FC = () => {
@@ -173,6 +174,14 @@ export const DashboardHubPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            to="/dashboard/analytics"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-semibold transition"
+          >
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span>Analytics & Trends</span>
+          </Link>
+
           <Link
             to="/dashboard/history"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-semibold transition"

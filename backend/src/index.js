@@ -9,6 +9,8 @@ import deviceRoutes from './routes/deviceRoutes.js';
 import hostelRoutes from './routes/hostelRoutes.js';
 import messRoutes from './routes/messRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
+import displayRoutes from './routes/displayRoutes.js';
+import { startTokenSweeper } from './services/sweeper.js';
 
 dotenv.config();
 
@@ -52,6 +54,7 @@ app.use('/api/devices', deviceRoutes);
 app.use('/api/hostels', hostelRoutes);
 app.use('/api/messes', messRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/display', displayRoutes);
 
 // Default 404 handler for unmatched API routes
 app.use('/api', (req, res) => {
@@ -66,9 +69,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Socket.IO basic connection logging
+// Socket.IO connection and room management
 io.on('connection', (socket) => {
   console.log(`Socket client connected: ${socket.id}`);
+
+  // Allow kiosks and dashboards to join device or entity-specific rooms
+  socket.on('join', (room) => {
+    if (typeof room === 'string') {
+      socket.join(room);
+      console.log(`Socket ${socket.id} joined room: ${room}`);
+    }
+  });
+
+  socket.on('leave', (room) => {
+    if (typeof room === 'string') {
+      socket.leave(room);
+      console.log(`Socket ${socket.id} left room: ${room}`);
+    }
+  });
 
   socket.on('disconnect', () => {
     console.log(`Socket client disconnected: ${socket.id}`);
@@ -78,6 +96,8 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 HOSTEL360 Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
+  // Start background QR token expiration sweeper
+  startTokenSweeper();
 });
 
 export { app, server, io };

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { 
   Laptop, Plus, RefreshCw, ShieldAlert, CheckCircle2, 
-  XCircle, Copy, Check, AlertTriangle, Radio, DoorOpen, Utensils
+  XCircle, Copy, Check, AlertTriangle, Radio, DoorOpen, Utensils,
+  QrCode, ExternalLink
 } from 'lucide-react';
 
 interface Gate {
@@ -306,15 +307,31 @@ export const DeviceManagementPage: React.FC = () => {
                     Added {new Date(device.created_at).toLocaleDateString()}
                   </span>
 
-                  {device.is_active && (
-                    <button
-                      onClick={() => handleDisableDevice(device.id, device.device_name)}
-                      className="text-red-400 hover:text-red-300 font-medium hover:underline flex items-center gap-1"
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      Revoke Secret
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {device.is_active && (
+                      <a
+                        href={`/display/${device.purpose.toLowerCase()}/${device.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-400 hover:text-sky-300 font-semibold hover:underline flex items-center gap-1"
+                        title="Open live kiosk QR terminal"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        Open Kiosk
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+
+                    {device.is_active && (
+                      <button
+                        onClick={() => handleDisableDevice(device.id, device.device_name)}
+                        className="text-red-400 hover:text-red-300 font-medium hover:underline flex items-center gap-1"
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        Revoke
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

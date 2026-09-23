@@ -7,10 +7,16 @@ import { DeviceManagementPage } from './pages/DeviceManagementPage';
 import { HostelRoomManagementPage } from './pages/HostelRoomManagementPage';
 import { StudentManagementPage } from './pages/StudentManagementPage';
 import { MessMealWindowManagementPage } from './pages/MessMealWindowManagementPage';
+import { KioskDisplayPage } from './pages/KioskDisplayPage';
 
 const Navigation = () => {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+
+  // Kiosk screens run borderless without the website navbar
+  if (location.pathname.startsWith('/display/')) {
+    return null;
+  }
 
   const navItems = [
     { to: '/app', label: 'Student App', icon: UserCheck, roleRequired: 'STUDENT' },
@@ -235,8 +241,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/display/gate/:deviceId" element={<GateKioskPlaceholder />} />
-              <Route path="/display/mess/:deviceId" element={<MessKioskPlaceholder />} />
+              <Route path="/display/gate/:deviceId" element={<KioskDisplayPage />} />
+              <Route path="/display/mess/:deviceId" element={<KioskDisplayPage />} />
               <Route
                 path="/dashboard/devices"
                 element={

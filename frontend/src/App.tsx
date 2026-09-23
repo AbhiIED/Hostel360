@@ -1,9 +1,12 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { QrCode, Shield, Utensils, LayoutDashboard, UserCheck, LogOut, LogIn } from 'lucide-react';
+import { QrCode, Shield, Utensils, LayoutDashboard, UserCheck, LogOut, LogIn, Building2, GraduationCap, Laptop } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DeviceManagementPage } from './pages/DeviceManagementPage';
+import { HostelRoomManagementPage } from './pages/HostelRoomManagementPage';
+import { StudentManagementPage } from './pages/StudentManagementPage';
+import { MessMealWindowManagementPage } from './pages/MessMealWindowManagementPage';
 
 const Navigation = () => {
   const location = useLocation();
@@ -172,25 +175,43 @@ const MessKioskPlaceholder = () => (
 
 const DashboardPlaceholder = () => {
   const { user } = useAuth();
+  const adminLinks = [
+    { to: '/dashboard/hostels', label: 'Hostels & Rooms', desc: 'Manage hostels, rooms, and gates', icon: Building2, color: 'sky' },
+    { to: '/dashboard/students', label: 'Student Registry', desc: 'View, register, and assign students', icon: GraduationCap, color: 'indigo' },
+    { to: '/dashboard/messes', label: 'Messes & Meals', desc: 'Configure messes and meal windows', icon: Utensils, color: 'emerald' },
+    { to: '/dashboard/devices', label: 'Hardware Devices', desc: 'Manage kiosk display devices', icon: Laptop, color: 'amber' },
+  ];
+  const colorMap: Record<string, string> = {
+    sky: 'bg-sky-500/10 border-sky-500/20 text-sky-400 hover:border-sky-500/50',
+    indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:border-indigo-500/50',
+    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:border-emerald-500/50',
+    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:border-amber-500/50',
+  };
   return (
-    <div className="max-w-2xl mx-auto py-12 px-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+    <div className="max-w-4xl mx-auto py-12 px-4">
+      <div className="text-center mb-10">
         <LayoutDashboard className="w-12 h-12 text-amber-400 mx-auto mb-4" />
         <h2 className="text-2xl font-bold text-white mb-2">Management Dashboard</h2>
-        <p className="text-slate-400 text-sm mb-4">
+        <p className="text-slate-400 text-sm">
           Logged in as: <span className="text-white font-semibold">{user?.name}</span> (<span className="text-amber-400">{user?.role}</span>)
         </p>
-        <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300 mb-6">
-          Ready for Phase 4 (Entity CRUD) and Phase 8 (Socket.IO Live Occupancy & Feeds).
-        </div>
-        {user?.role === 'SUPER_ADMIN' && (
-          <Link
-            to="/dashboard/devices"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition"
-          >
-            <span>Manage Hardware Devices (Kiosks)</span>
-          </Link>
-        )}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        {adminLinks.map(link => {
+          const Icon = link.icon;
+          const show = user?.role === 'SUPER_ADMIN' ||
+            (user?.role === 'WARDEN' && ['Hostels & Rooms', 'Student Registry'].includes(link.label)) ||
+            (user?.role === 'MESS_ADMIN' && link.label === 'Messes & Meals');
+          if (!show) return null;
+          return (
+            <Link key={link.to} to={link.to}
+              className={`p-5 rounded-2xl border transition ${colorMap[link.color]}`}>
+              <Icon className="w-8 h-8 mb-3" />
+              <h3 className="font-semibold text-white text-base">{link.label}</h3>
+              <p className="text-xs text-slate-400 mt-1">{link.desc}</p>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -221,6 +242,30 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
                     <DeviceManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/hostels"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN']}>
+                    <HostelRoomManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/students"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN']}>
+                    <StudentManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/messes"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'MESS_ADMIN']}>
+                    <MessMealWindowManagementPage />
                   </ProtectedRoute>
                 }
               />

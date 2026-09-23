@@ -64,6 +64,8 @@ interface QrTokenResponse {
     mess?: any;
   };
   meal_window?: MealWindowInfo | null;
+  next_meal_window?: MealWindowInfo | null;
+  all_meal_windows?: MealWindowInfo[];
 }
 
 interface ConfirmationFlash {
@@ -87,6 +89,8 @@ export const KioskDisplayPage: React.FC = () => {
 
   const [qrToken, setQrToken] = useState<string>('');
   const [mealWindow, setMealWindow] = useState<MealWindowInfo | null>(null);
+  const [nextMealWindow, setNextMealWindow] = useState<MealWindowInfo | null>(null);
+  const [allMealWindows, setAllMealWindows] = useState<MealWindowInfo[]>([]);
   const [ttlTotal, setTtlTotal] = useState<number>(20);
   const [secondsLeft, setSecondsLeft] = useState<number>(20);
   const [isRotating, setIsRotating] = useState<boolean>(false);
@@ -150,6 +154,11 @@ export const KioskDisplayPage: React.FC = () => {
     try {
       const res = await axios.get(`/api/display/info/${deviceId}`);
       setDeviceInfo(res.data.device);
+      if (res.data.meal_status) {
+        setMealWindow(res.data.meal_status.active || null);
+        setNextMealWindow(res.data.meal_status.next || null);
+        setAllMealWindows(res.data.meal_status.allWindows || []);
+      }
     } catch (err: any) {
       console.warn('Could not fetch device metadata:', err);
     }
@@ -176,6 +185,8 @@ export const KioskDisplayPage: React.FC = () => {
       const data = res.data;
       setQrToken(data.token);
       setMealWindow(data.meal_window || null);
+      setNextMealWindow(data.next_meal_window || null);
+      setAllMealWindows(data.all_meal_windows || []);
       const ttl = data.ttl || 20;
       setTtlTotal(ttl);
       setSecondsLeft(ttl);
@@ -445,9 +456,27 @@ export const KioskDisplayPage: React.FC = () => {
             {/* Header Badge */}
             <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 text-xs font-semibold mb-6 shadow-md backdrop-blur">
               <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-              <span>DYNAMIC ONE-TIME QR CODE</span>
-              <span className="text-slate-500">•</span>
-              <span className="text-slate-400">{ttlTotal}s ANTI-PROXY CYCLE</span>
+              {deviceInfo?.purpose === 'MESS' && mealWindow ? (
+                <>
+                  <span className="text-amber-400 font-bold">{mealWindow.meal_type} SERVICE ACTIVE</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-300">({mealWindow.start_time} - {mealWindow.end_time})</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400">{ttlTotal}s QR ROTATION</span>
+                </>
+              ) : deviceInfo?.purpose === 'MESS' && !mealWindow ? (
+                <>
+                  <span className="text-amber-400 font-bold">MESS SERVICE STANDBY</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400">NO MEAL CURRENTLY SERVING</span>
+                </>
+              ) : (
+                <>
+                  <span>DYNAMIC ONE-TIME QR CODE</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400">{ttlTotal}s ANTI-PROXY CYCLE</span>
+                </>
+              )}
             </div>
 
             {/* QR Card Container */}
@@ -458,9 +487,29 @@ export const KioskDisplayPage: React.FC = () => {
               <div className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-sky-400 rounded-bl-sm pointer-events-none" />
               <div className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-sky-400 rounded-br-sm pointer-events-none" />
 
-              {/* QR Canvas / SVG */}
+              {/* QR Canvas / SVG or Mess Standby Box */}
               <div className="bg-white p-5 rounded-2xl shadow-inner flex items-center justify-center transition-all duration-300">
-                {qrToken ? (
+                {deviceInfo?.purpose === 'MESS' && !mealWindow ? (
+                  <div className="w-56 h-56 sm:w-72 sm:h-72 flex flex-col items-center justify-center p-3 text-center bg-slate-950 rounded-2xl border border-amber-500/20 text-white">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-2">
+                      <Utensils className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs font-bold text-amber-300 uppercase tracking-wider mb-1">
+                      Counter Standby
+                    </div>
+                    <p className="text-[11px] text-slate-400 mb-2">
+                      {nextMealWindow
+                        ? `Next: ${nextMealWindow.meal_type} (${nextMealWindow.start_time} - ${nextMealWindow.end_time})`
+                        : 'No meal window scheduled right now'}
+                    </p>
+                    <div className="w-full bg-slate-900/90 rounded-lg p-2 text-[10px] text-slate-300 space-y-0.5 border border-slate-800 text-left">
+                      <div className="flex justify-between"><span>Breakfast</span><span className="font-mono">07:30 - 09:30</span></div>
+                      <div className="flex justify-between"><span>Lunch</span><span className="font-mono">12:30 - 14:30</span></div>
+                      <div className="flex justify-between"><span>Snacks</span><span className="font-mono">17:00 - 18:30</span></div>
+                      <div className="flex justify-between"><span>Dinner</span><span className="font-mono">20:00 - 22:00</span></div>
+                    </div>
+                  </div>
+                ) : qrToken ? (
                   <QRCodeSVG
                     value={qrToken}
                     size={280}
@@ -480,10 +529,18 @@ export const KioskDisplayPage: React.FC = () => {
               <div className="mt-6 text-center">
                 <div className="text-base font-bold text-white tracking-wide flex items-center justify-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-sky-400" />
-                  <span>Scan with HOSTEL360 Student App</span>
+                  <span>
+                    {deviceInfo?.purpose === 'MESS'
+                      ? mealWindow
+                        ? `Scan with Student App for ${mealWindow.meal_type}`
+                        : 'Mess Counter on Standby'
+                      : 'Scan with HOSTEL360 Student App'}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Point camera at screen • Authenticated scans record attendance instantly
+                  {deviceInfo?.purpose === 'MESS' && !mealWindow
+                    ? 'QR code activates automatically when next meal service opens'
+                    : 'Point camera at screen • Authenticated scans record attendance instantly'}
                 </p>
               </div>
 

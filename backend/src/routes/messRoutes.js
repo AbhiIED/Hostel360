@@ -1,5 +1,5 @@
 import express from 'express';
-import { listMesses, createMess, getMess, updateMess, deleteMess } from '../controllers/messController.js';
+import { listMesses, createMess, getMess, updateMess, deleteMess, getActiveWindow } from '../controllers/messController.js';
 import { listMealWindows, createMealWindow, updateMealWindow } from '../controllers/mealWindowController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -7,6 +7,9 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+// 7.1 Active meal window resolver
+router.get('/:id/active-window', getActiveWindow);
 
 // Mess CRUD — SUPER_ADMIN only
 router.get('/', authorize('SUPER_ADMIN', 'MESS_ADMIN'), listMesses);

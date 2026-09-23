@@ -1,5 +1,6 @@
 import prisma from '../prisma.js';
 import { generateQrToken } from '../services/qrTokenService.js';
+import { resolveMealWindow } from '../services/mealWindowService.js';
 
 /**
  * GET /api/display/qr
@@ -42,6 +43,8 @@ export async function getQrToken(req, res) {
         mess: tokenResult.record.mess,
       },
       meal_window: tokenResult.meal_window,
+      next_meal_window: tokenResult.next_meal_window,
+      all_meal_windows: tokenResult.all_meal_windows,
     });
   } catch (error) {
     console.error('Error generating QR token:', error);
@@ -98,7 +101,12 @@ export async function getDisplayInfo(req, res) {
       return res.status(404).json({ error: 'Display device not found' });
     }
 
-    return res.status(200).json({ device });
+    let mealStatus = null;
+    if (device.purpose === 'MESS' && device.mess?.id) {
+      mealStatus = await resolveMealWindow(device.mess.id);
+    }
+
+    return res.status(200).json({ device, meal_status: mealStatus });
   } catch (error) {
     console.error('Error fetching display info:', error);
     return res.status(500).json({ error: 'Failed to fetch display info' });

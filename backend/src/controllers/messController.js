@@ -205,3 +205,16 @@ export async function deleteMess(req, res) {
     return res.status(500).json({ error: 'Internal server error deleting mess' });
   }
 }
+
+// 7.1 Resolve active and upcoming meal windows
+export async function getActiveWindow(req, res) {
+  try {
+    const { id } = req.params;
+    const { resolveMealWindow } = await import('../services/mealWindowService.js');
+    const resolved = await resolveMealWindow(id);
+    return res.json(resolved);
+  } catch (error) {
+    console.error('Get active window error:', error);
+    return res.status(500).json({ error: 'Internal server error resolving meal window' });
+  }
+}

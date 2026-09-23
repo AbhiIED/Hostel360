@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import prisma from '../prisma.js';
 import { hashToken } from '../utils/token.js';
 
+import { resolveMealWindow } from './mealWindowService.js';
+
 /**
  * Returns the currently active meal window for a given mess, based on current time.
  * @param {string} messId
@@ -9,32 +11,8 @@ import { hashToken } from '../utils/token.js';
  * @returns {Promise<object|null>}
  */
 export async function getActiveMealWindow(messId, now = new Date()) {
-  if (!messId) return null;
-
-  // Format current time as HH:MM in Indian Standard Time (MANIT) / local
-  const timeFormatter = new Intl.DateTimeFormat('en-IN', {
-    timeZone: process.env.TIMEZONE || 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const currentTime = timeFormatter.format(now); // e.g. "08:15"
-
-  const windows = await prisma.mealWindow.findMany({
-    where: {
-      mess_id: messId,
-      is_active: true,
-    },
-  });
-
-  for (const win of windows) {
-    if (currentTime >= win.start_time && currentTime <= win.end_time) {
-      return win;
-    }
-  }
-
-  // Fallback: If no window strictly contains currentTime, return null
-  return null;
+  const resolved = await resolveMealWindow(messId, now);
+  return resolved.active;
 }
 
 /**
@@ -63,10 +41,15 @@ export async function generateQrToken(device) {
     },
   });
 
-  // Resolve active meal window if device purpose is MESS
+  // Resolve active and upcoming meal windows if device purpose is MESS
   let activeMealWindow = null;
+  let nextMealWindow = null;
+  let allMealWindows = [];
   if (device.purpose === 'MESS' && device.mess_id) {
-    activeMealWindow = await getActiveMealWindow(device.mess_id, now);
+    const resolved = await resolveMealWindow(device.mess_id, now);
+    activeMealWindow = resolved.active;
+    nextMealWindow = resolved.next;
+    allMealWindows = resolved.allWindows;
   }
 
   // Create QR token record in database with SHA-256 hash only
@@ -98,6 +81,8 @@ export async function generateQrToken(device) {
     ttl: ttlSeconds,
     record,
     meal_window: activeMealWindow,
+    next_meal_window: nextMealWindow,
+    all_meal_windows: allMealWindows,
   };
 }
 

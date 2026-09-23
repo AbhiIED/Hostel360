@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import {
   Building2, Plus, RefreshCw, Edit3, Trash2, DoorOpen,
-  AlertTriangle, Users, Layers, ChevronRight, X, Check
+  AlertTriangle, Users, Layers, ChevronRight, X
 } from 'lucide-react';
 
 interface Hostel {

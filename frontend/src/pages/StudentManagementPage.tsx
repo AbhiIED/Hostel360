@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 import {
   Users, Plus, RefreshCw, Edit3, Trash2, Search,
-  AlertTriangle, X, ChevronLeft, ChevronRight, GraduationCap,
-  ArrowUpDown
+  AlertTriangle, X, ChevronLeft, ChevronRight, GraduationCap
 } from 'lucide-react';
 
 interface StudentItem {

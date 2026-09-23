@@ -105,8 +105,8 @@ export const KioskDisplayPage: React.FC = () => {
   const [confirmation, setConfirmation] = useState<ConfirmationFlash | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const flashTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageKey = `hostel360_device_secret_${deviceId}`;
 
   // Live Clock updater
@@ -503,10 +503,21 @@ export const KioskDisplayPage: React.FC = () => {
                         : 'No meal window scheduled right now'}
                     </p>
                     <div className="w-full bg-slate-900/90 rounded-lg p-2 text-[10px] text-slate-300 space-y-0.5 border border-slate-800 text-left">
-                      <div className="flex justify-between"><span>Breakfast</span><span className="font-mono">07:30 - 09:30</span></div>
-                      <div className="flex justify-between"><span>Lunch</span><span className="font-mono">12:30 - 14:30</span></div>
-                      <div className="flex justify-between"><span>Snacks</span><span className="font-mono">17:00 - 18:30</span></div>
-                      <div className="flex justify-between"><span>Dinner</span><span className="font-mono">20:00 - 22:00</span></div>
+                      {allMealWindows.length > 0 ? (
+                        allMealWindows.map((w) => (
+                          <div key={w.id} className="flex justify-between">
+                            <span className="capitalize">{w.meal_type.toLowerCase()}</span>
+                            <span className="font-mono">{w.start_time} - {w.end_time}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          <div className="flex justify-between"><span>Breakfast</span><span className="font-mono">07:30 - 09:30</span></div>
+                          <div className="flex justify-between"><span>Lunch</span><span className="font-mono">12:30 - 14:30</span></div>
+                          <div className="flex justify-between"><span>Snacks</span><span className="font-mono">17:00 - 18:30</span></div>
+                          <div className="flex justify-between"><span>Dinner</span><span className="font-mono">20:00 - 22:00</span></div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : qrToken ? (

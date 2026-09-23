@@ -11,6 +11,7 @@ import messRoutes from './routes/messRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import displayRoutes from './routes/displayRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 import { startTokenSweeper } from './services/sweeper.js';
 
 dotenv.config();
@@ -57,6 +58,7 @@ app.use('/api/messes', messRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/display', displayRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Default 404 handler for unmatched API routes
 app.use('/api', (req, res) => {

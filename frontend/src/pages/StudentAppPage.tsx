@@ -17,7 +17,6 @@ import {
   Utensils,
   VideoOff,
   User,
-  Sparkles,
   Clock,
 } from 'lucide-react';
 

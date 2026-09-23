@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { QrCode, Shield, Utensils, LayoutDashboard, UserCheck, LogOut, LogIn, Building2, GraduationCap, Laptop } from 'lucide-react';
+import { QrCode, Shield, Utensils, LayoutDashboard, UserCheck, LogOut, LogIn } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
@@ -9,6 +9,8 @@ import { StudentManagementPage } from './pages/StudentManagementPage';
 import { MessMealWindowManagementPage } from './pages/MessMealWindowManagementPage';
 import { KioskDisplayPage } from './pages/KioskDisplayPage';
 import { StudentAppPage } from './pages/StudentAppPage';
+import { DashboardHubPage } from './pages/DashboardHubPage';
+import { AttendanceHistoryPage } from './pages/AttendanceHistoryPage';
 
 const Navigation = () => {
   const location = useLocation();
@@ -136,94 +138,6 @@ const HomeView = () => (
   </div>
 );
 
-const StudentAppPlaceholder = () => {
-  const { user } = useAuth();
-  return (
-    <div className="max-w-2xl mx-auto py-12 px-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-        <UserCheck className="w-12 h-12 text-sky-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-white mb-2">Student App Interface</h2>
-        <p className="text-slate-400 text-sm mb-4">
-          Logged in as: <span className="text-white font-semibold">{user?.name}</span> ({user?.student?.roll_number})
-        </p>
-        <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300">
-          State: <span className="text-emerald-400 font-bold">{user?.student?.current_state}</span> | Hostel: {user?.student?.hostel?.name} | Room: {user?.student?.room?.room_number}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const GateKioskPlaceholder = () => (
-  <div className="max-w-2xl mx-auto py-12 px-4">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-      <QrCode className="w-12 h-12 text-indigo-400 mx-auto mb-4" />
-      <h2 className="text-2xl font-bold text-white mb-2">Gate Kiosk Display</h2>
-      <p className="text-slate-400 text-sm mb-6">Route: <code>/display/gate/:deviceId</code></p>
-      <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300">
-        Ready for Phase 3 (Device Secret Auth), Phase 5 (Rotating QR), and Phase 6 (5s Photo Confirmation Flash).
-      </div>
-    </div>
-  </div>
-);
-
-const MessKioskPlaceholder = () => (
-  <div className="max-w-2xl mx-auto py-12 px-4">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-      <Utensils className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-      <h2 className="text-2xl font-bold text-white mb-2">Mess Kiosk Display</h2>
-      <p className="text-slate-400 text-sm mb-6">Route: <code>/display/mess/:deviceId</code></p>
-      <div className="p-4 bg-slate-800/50 rounded-xl text-xs text-slate-300">
-        Ready for Phase 7 (Active Meal Window Dynamic QR & Confirmation Flash).
-      </div>
-    </div>
-  </div>
-);
-
-const DashboardPlaceholder = () => {
-  const { user } = useAuth();
-  const adminLinks = [
-    { to: '/dashboard/hostels', label: 'Hostels & Rooms', desc: 'Manage hostels, rooms, and gates', icon: Building2, color: 'sky' },
-    { to: '/dashboard/students', label: 'Student Registry', desc: 'View, register, and assign students', icon: GraduationCap, color: 'indigo' },
-    { to: '/dashboard/messes', label: 'Messes & Meals', desc: 'Configure messes and meal windows', icon: Utensils, color: 'emerald' },
-    { to: '/dashboard/devices', label: 'Hardware Devices', desc: 'Manage kiosk display devices', icon: Laptop, color: 'amber' },
-  ];
-  const colorMap: Record<string, string> = {
-    sky: 'bg-sky-500/10 border-sky-500/20 text-sky-400 hover:border-sky-500/50',
-    indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:border-indigo-500/50',
-    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:border-emerald-500/50',
-    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:border-amber-500/50',
-  };
-  return (
-    <div className="max-w-4xl mx-auto py-12 px-4">
-      <div className="text-center mb-10">
-        <LayoutDashboard className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-white mb-2">Management Dashboard</h2>
-        <p className="text-slate-400 text-sm">
-          Logged in as: <span className="text-white font-semibold">{user?.name}</span> (<span className="text-amber-400">{user?.role}</span>)
-        </p>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {adminLinks.map(link => {
-          const Icon = link.icon;
-          const show = user?.role === 'SUPER_ADMIN' ||
-            (user?.role === 'WARDEN' && ['Hostels & Rooms', 'Student Registry'].includes(link.label)) ||
-            (user?.role === 'MESS_ADMIN' && link.label === 'Messes & Meals');
-          if (!show) return null;
-          return (
-            <Link key={link.to} to={link.to}
-              className={`p-5 rounded-2xl border transition ${colorMap[link.color]}`}>
-              <Icon className="w-8 h-8 mb-3" />
-              <h3 className="font-semibold text-white text-base">{link.label}</h3>
-              <p className="text-xs text-slate-400 mt-1">{link.desc}</p>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 export default function App() {
   return (
     <AuthProvider>
@@ -285,10 +199,26 @@ export default function App() {
                 }
               />
               <Route
+                path="/dashboard/history"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                    <AttendanceHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                    <DashboardHubPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/dashboard/*"
                 element={
                   <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
-                    <DashboardPlaceholder />
+                    <DashboardHubPage />
                   </ProtectedRoute>
                 }
               />

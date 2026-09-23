@@ -8,6 +8,7 @@ import { HostelRoomManagementPage } from './pages/HostelRoomManagementPage';
 import { StudentManagementPage } from './pages/StudentManagementPage';
 import { MessMealWindowManagementPage } from './pages/MessMealWindowManagementPage';
 import { KioskDisplayPage } from './pages/KioskDisplayPage';
+import { StudentAppPage } from './pages/StudentAppPage';
 
 const Navigation = () => {
   const location = useLocation();
@@ -237,7 +238,15 @@ export default function App() {
                 path="/app/*"
                 element={
                   <ProtectedRoute allowedRoles={['STUDENT']}>
-                    <StudentAppPlaceholder />
+                    <StudentAppPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app"
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT']}>
+                    <StudentAppPage />
                   </ProtectedRoute>
                 }
               />

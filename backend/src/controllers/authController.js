@@ -1,13 +1,32 @@
 import bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/token.js';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address').max(255),
+  password: z.string().min(1, 'Password is required').max(128),
+});
+
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+});
+
+const logoutSchema = z.object({
+  refreshToken: z.string().optional(),
+});
 
 export async function login(req, res) {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
     }
+
+    const { email, password } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
@@ -73,11 +92,15 @@ export async function login(req, res) {
 
 export async function refresh(req, res) {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      return res.status(400).json({ error: 'Refresh token is required' });
+    const parsed = refreshSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
     }
 
+    const { refreshToken } = parsed.data;
     const hashed = hashToken(refreshToken);
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token_hash: hashed },
@@ -153,7 +176,8 @@ export async function refresh(req, res) {
 
 export async function logout(req, res) {
   try {
-    const { refreshToken } = req.body;
+    const parsed = logoutSchema.safeParse(req.body);
+    const refreshToken = parsed.success ? parsed.data.refreshToken : req.body?.refreshToken;
     if (refreshToken) {
       const hashed = hashToken(refreshToken);
       await prisma.refreshToken.updateMany({

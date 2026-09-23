@@ -78,6 +78,17 @@ export async function createMess(req, res) {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'MESS_CREATED',
+        target_type: 'Mess',
+        target_id: mess.id,
+        meta: { name: mess.name },
+      },
+    });
+
     return res.status(201).json({ mess });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -177,6 +188,17 @@ export async function updateMess(req, res) {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'MESS_UPDATED',
+        target_type: 'Mess',
+        target_id: mess.id,
+        meta: { name: mess.name, updates: parsed.data },
+      },
+    });
+
     return res.json({ mess });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -197,7 +219,19 @@ export async function deleteMess(req, res) {
       return res.status(404).json({ error: 'Mess not found' });
     }
 
-    await prisma.mess.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.mess.delete({ where: { id } }),
+      prisma.auditLog.create({
+        data: {
+          actor_id: req.user.id,
+          actor_type: 'USER',
+          action: 'MESS_DELETED',
+          target_type: 'Mess',
+          target_id: id,
+          meta: { name: existing.name },
+        },
+      }),
+    ]);
 
     return res.json({ message: `Mess '${existing.name}' deleted successfully` });
   } catch (error) {

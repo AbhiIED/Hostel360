@@ -162,6 +162,17 @@ export async function createStudent(req, res) {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          actor_id: req.user.id,
+          actor_type: 'USER',
+          action: 'STUDENT_CREATED',
+          target_type: 'Student',
+          target_id: newStudent.id,
+          meta: { roll_number, email: user.email, name: user.name },
+        },
+      });
+
       return newStudent;
     });
 
@@ -304,6 +315,17 @@ export async function updateStudent(req, res) {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          actor_id: req.user.id,
+          actor_type: 'USER',
+          action: 'STUDENT_UPDATED',
+          target_type: 'Student',
+          target_id: updatedStudent.id,
+          meta: { roll_number: updatedStudent.roll_number, updates: parsed.data },
+        },
+      });
+
       return updatedStudent;
     });
 
@@ -340,7 +362,19 @@ export async function deleteStudent(req, res) {
     }
 
     // Delete User (cascades to Student via onDelete: Cascade)
-    await prisma.user.delete({ where: { id: existing.user_id } });
+    await prisma.$transaction([
+      prisma.user.delete({ where: { id: existing.user_id } }),
+      prisma.auditLog.create({
+        data: {
+          actor_id: req.user.id,
+          actor_type: 'USER',
+          action: 'STUDENT_DELETED',
+          target_type: 'Student',
+          target_id: id,
+          meta: { roll_number: existing.roll_number, name: existing.user.name },
+        },
+      }),
+    ]);
 
     return res.json({ message: `Student '${existing.user.name}' (${existing.roll_number}) deleted successfully` });
   } catch (error) {

@@ -76,6 +76,17 @@ export async function createHostel(req, res) {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'HOSTEL_CREATED',
+        target_type: 'Hostel',
+        target_id: hostel.id,
+        meta: { code: hostel.code, name: hostel.name, type: hostel.type },
+      },
+    });
+
     return res.status(201).json({ hostel });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -168,6 +179,17 @@ export async function updateHostel(req, res) {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'HOSTEL_UPDATED',
+        target_type: 'Hostel',
+        target_id: hostel.id,
+        meta: { code: hostel.code, updates: parsed.data },
+      },
+    });
+
     return res.json({ hostel });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -198,7 +220,19 @@ export async function deleteHostel(req, res) {
       });
     }
 
-    await prisma.hostel.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.hostel.delete({ where: { id } }),
+      prisma.auditLog.create({
+        data: {
+          actor_id: req.user.id,
+          actor_type: 'USER',
+          action: 'HOSTEL_DELETED',
+          target_type: 'Hostel',
+          target_id: id,
+          meta: { code: existing.code, name: existing.name },
+        },
+      }),
+    ]);
 
     return res.json({ message: `Hostel '${existing.name}' deleted successfully` });
   } catch (error) {

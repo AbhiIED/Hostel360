@@ -15,15 +15,22 @@ export async function authenticateDevice(req, res, next) {
     let candidateDevices = [];
 
     if (deviceIdHint) {
-      const device = await prisma.device.findUnique({
-        where: { id: deviceIdHint },
+      const device = await prisma.device.findFirst({
+        where: {
+          OR: [
+            { id: deviceIdHint },
+            { device_code: deviceIdHint },
+          ],
+        },
         include: {
           gate: { include: { hostel: true } },
           mess: true,
         },
       });
       if (device) candidateDevices.push(device);
-    } else if (deviceCodeHint) {
+    }
+
+    if (candidateDevices.length === 0 && deviceCodeHint) {
       const device = await prisma.device.findUnique({
         where: { device_code: deviceCodeHint },
         include: {
@@ -32,7 +39,9 @@ export async function authenticateDevice(req, res, next) {
         },
       });
       if (device) candidateDevices.push(device);
-    } else {
+    }
+
+    if (candidateDevices.length === 0) {
       // Fallback: search all active devices
       candidateDevices = await prisma.device.findMany({
         where: { is_active: true },

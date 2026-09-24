@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
+import { useAuth } from '../context/AuthContext';
 import {
-  QrCode,
+  Shield,
   ShieldCheck,
   Clock,
   Maximize2,
@@ -15,11 +16,10 @@ import {
   CheckCircle2,
   Building,
   Utensils,
-  Wifi,
-  WifiOff,
   SlidersHorizontal,
   X,
   Copy,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface DeviceMetadata {
@@ -81,6 +81,7 @@ interface ConfirmationFlash {
 export const KioskDisplayPage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   const [deviceInfo, setDeviceInfo] = useState<DeviceMetadata | null>(null);
   const [deviceSecret, setDeviceSecret] = useState<string>('');
@@ -110,6 +111,19 @@ export const KioskDisplayPage: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageKey = `hostel360_device_secret_${deviceId}`;
+
+  // Exit navigation handler
+  const handleExit = () => {
+    if (isAuthenticated) {
+      if (user?.role === 'STUDENT') {
+        navigate('/app');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      navigate('/');
+    }
+  };
 
   // Live Clock updater
   useEffect(() => {
@@ -302,60 +316,57 @@ export const KioskDisplayPage: React.FC = () => {
     setErrorStatus(null);
   };
 
-  // Color calculation for circular ring & timer badge
+  // Percentage for progress bar
   const percentLeft = Math.max(0, Math.min(100, (secondsLeft / ttlTotal) * 100));
   const isUrgent = secondsLeft <= 5;
   const isWarning = secondsLeft > 5 && secondsLeft <= 10;
 
-  const timerColor = isUrgent
-    ? 'text-rose-400 stroke-rose-500 border-rose-500/40 bg-rose-500/10'
-    : isWarning
-    ? 'text-amber-400 stroke-amber-500 border-amber-500/40 bg-amber-500/10'
-    : 'text-emerald-400 stroke-emerald-500 border-emerald-500/40 bg-emerald-500/10';
-
-  const strokeColor = isUrgent ? '#f43f5e' : isWarning ? '#f59e0b' : '#10b981';
-
   return (
-    <div className="relative min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col justify-between select-none overflow-hidden font-sans">
-      {/* Background ambient glowing orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-600/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
-
+    <div className="relative min-h-screen w-full bg-[#FAF9F6] text-[#1C2430] flex flex-col justify-between select-none font-sans">
       {/* TOP HEADER BAR */}
-      <header className="px-6 py-4 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between z-10">
-        {/* Left: Branding & Campus */}
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-500 p-0.5 shadow-lg shadow-sky-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <QrCode className="w-6 h-6 text-sky-400" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                HOSTEL<span className="text-sky-400">360</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30">
-                  KIOSK TERMINAL
+      <header className="px-4 sm:px-6 py-3 border-b border-[#E4E1DA] bg-white flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        {/* Left: Exit Navigation & Crest */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExit}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#FAF9F6] hover:bg-[#F2EFE9] text-[#1C2430] border border-[#E4E1DA] text-xs font-medium transition cursor-pointer"
+            title="Exit kiosk and return"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-[#26415C]" strokeWidth={2} />
+            <span>Exit kiosk</span>
+          </button>
+
+          <div className="h-5 w-px bg-[#E4E1DA]" />
+
+          <div className="flex items-center gap-2.5">
+            <Shield className="w-5 h-5 text-[#26415C]" strokeWidth={1.75} />
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-serif text-base font-semibold tracking-tight text-[#1C2430]">
+                  HOSTEL360
                 </span>
-              </h1>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-[#FAF9F6] text-[#5B6472] border border-[#E4E1DA] font-medium">
+                  Terminal kiosk
+                </span>
+              </div>
+              <p className="text-[10px] text-[#5B6472] font-normal tracking-wide">
+                MANIT Bhopal • Council of Wardens
+              </p>
             </div>
-            <p className="text-xs text-slate-400 font-medium tracking-wide">
-              MANIT BHOPAL CAMPUS • SECURE ACCESS CONTROL
-            </p>
           </div>
         </div>
 
-        {/* Center: Location Details */}
+        {/* Center: Location Details & Meal Window */}
         <div className="hidden md:flex flex-col items-center text-center">
-          <div className="flex items-center gap-2 text-slate-200 font-semibold text-lg">
+          <div className="flex items-center gap-2 text-[#1C2430] font-medium text-sm">
             {deviceInfo?.purpose === 'MESS' ? (
               <>
-                <Utensils className="w-5 h-5 text-amber-400" />
-                <span>{deviceInfo.mess?.name || 'Campus Mess Counter'}</span>
+                <Utensils className="w-4 h-4 text-[#26415C]" strokeWidth={1.75} />
+                <span>{deviceInfo.mess?.name || 'Central Campus Mess Counter'}</span>
               </>
             ) : (
               <>
-                <Building className="w-5 h-5 text-sky-400" />
+                <Building className="w-4 h-4 text-[#26415C]" strokeWidth={1.75} />
                 <span>
                   {deviceInfo?.gate?.hostel?.name || deviceInfo?.device_name || 'Hostel Access Gate'}
                   {deviceInfo?.gate?.name ? ` — ${deviceInfo.gate.name}` : ''}
@@ -363,52 +374,51 @@ export const KioskDisplayPage: React.FC = () => {
               </>
             )}
           </div>
-          {deviceInfo?.purpose === 'MESS' && mealWindow && (
-            <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 px-3 py-0.5 rounded-full border border-amber-500/20 mt-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              <span className="font-bold">{mealWindow.meal_type} WINDOW</span>
-              <span className="text-slate-400">({mealWindow.start_time} - {mealWindow.end_time})</span>
+          {deviceInfo?.purpose === 'MESS' && (
+            <div className="text-[11px] text-[#5B6472] mt-0.5 flex items-center gap-1.5">
+              {mealWindow ? (
+                <span className="inline-flex items-center gap-1 text-[#2E7D5B] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D5B] animate-pulse" />
+                  {mealWindow.meal_type} window active ({mealWindow.start_time} - {mealWindow.end_time})
+                </span>
+              ) : (
+                <span className="text-[#B7791F] font-medium inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#B7791F]" />
+                  Dining counter standby • No active meal service
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Right: Clock & System Controls */}
-        <div className="flex items-center gap-4">
+        {/* Right: Clock & Terminal Controls */}
+        <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <div className="text-lg font-mono font-bold text-white tracking-wider">
+            <div className="text-sm font-mono font-medium text-[#1C2430] tabular-nums">
               {currentTime}
             </div>
-            <div className="text-xs text-slate-400">{currentDate}</div>
+            <div className="text-[11px] text-[#5B6472]">{currentDate}</div>
           </div>
 
-          <div className="h-8 w-px bg-slate-800" />
+          <div className="h-5 w-px bg-[#E4E1DA] hidden sm:block" />
 
           {/* Connection Status Badge */}
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border ${
               isSocketConnected
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                ? 'bg-[#2E7D5B]/10 border-[#2E7D5B]/30 text-[#2E7D5B]'
+                : 'bg-[#B3432B]/10 border-[#B3432B]/30 text-[#B3432B]'
             }`}
             title={isSocketConnected ? 'Real-time WebSocket Live' : 'WebSocket Disconnected'}
           >
-            {isSocketConnected ? (
-              <>
-                <Wifi className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">ONLINE</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">RECONNECTING</span>
-              </>
-            )}
+            <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-[#2E7D5B]' : 'bg-[#B3432B]'}`} />
+            <span className="hidden lg:inline">{isSocketConnected ? 'Live sync' : 'Reconnecting'}</span>
           </div>
 
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700/60 shadow"
+            className="p-2 rounded bg-white hover:bg-[#FAF9F6] text-[#5B6472] hover:text-[#1C2430] transition border border-[#E4E1DA] cursor-pointer"
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -417,7 +427,7 @@ export const KioskDisplayPage: React.FC = () => {
           {/* Config Settings Button */}
           <button
             onClick={() => setShowConfigModal(true)}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700/60 shadow"
+            className="p-2 rounded bg-white hover:bg-[#FAF9F6] text-[#5B6472] hover:text-[#1C2430] transition border border-[#E4E1DA] cursor-pointer"
             title="Configure Device Secret"
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -429,175 +439,190 @@ export const KioskDisplayPage: React.FC = () => {
       <main className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
         {errorStatus && !qrToken ? (
           /* Error / Configuration state */
-          <div className="max-w-md w-full bg-slate-900/90 border border-rose-500/30 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
-            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="w-8 h-8" />
+          <div className="max-w-md w-full bg-white border border-[#B3432B]/30 rounded-xl p-8 text-center shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-[#B3432B]/10 text-[#B3432B] flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6" strokeWidth={1.5} />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Display Offline</h2>
-            <p className="text-slate-400 text-sm mb-6 leading-relaxed">{errorStatus}</p>
-            <div className="flex gap-3 justify-center">
+            <h2 className="font-serif text-lg font-medium text-[#1C2430] mb-2">Display Offline</h2>
+            <p className="text-[#5B6472] text-xs mb-6 leading-relaxed">{errorStatus}</p>
+            <div className="flex gap-2 justify-center">
               <button
                 onClick={() => fetchNextQrToken()}
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium text-sm transition flex items-center gap-2 border border-slate-700"
+                className="px-4 py-2 bg-white hover:bg-[#FAF9F6] text-[#1C2430] rounded border border-[#E4E1DA] font-medium text-xs transition flex items-center gap-1.5 cursor-pointer"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
                 Retry
               </button>
               <button
                 onClick={() => setShowConfigModal(true)}
-                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-medium text-sm transition flex items-center gap-2 shadow-lg shadow-sky-600/30"
+                className="px-4 py-2 bg-[#26415C] hover:bg-[#1e344a] text-white rounded font-medium text-xs transition flex items-center gap-1.5 cursor-pointer"
               >
-                <KeyRound className="w-4 h-4" />
+                <KeyRound className="w-3.5 h-3.5" />
                 Configure Secret
               </button>
             </div>
           </div>
         ) : (
-          /* ACTIVE ROTATING QR CARD */
-          <div className="flex flex-col items-center">
+          /* ACTIVE KIOSK DISPLAY CARD */
+          <div className="flex flex-col items-center w-full max-w-lg">
             {/* Header Badge */}
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 text-xs font-semibold mb-6 shadow-md backdrop-blur">
-              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E4E1DA] text-xs font-medium text-[#26415C] mb-6 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-[#26415C] animate-pulse" />
               {deviceInfo?.purpose === 'MESS' && mealWindow ? (
                 <>
-                  <span className="text-amber-400 font-bold">{mealWindow.meal_type} SERVICE ACTIVE</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-slate-300">({mealWindow.start_time} - {mealWindow.end_time})</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-slate-400">{ttlTotal}s QR ROTATION</span>
+                  <span>{mealWindow.meal_type} service active</span>
+                  <span className="text-[#E4E1DA]">•</span>
+                  <span className="text-[#5B6472] font-mono">{mealWindow.start_time} - {mealWindow.end_time}</span>
+                  <span className="text-[#E4E1DA]">•</span>
+                  <span className="text-[#5B6472]">{ttlTotal}s dynamic cycle</span>
                 </>
               ) : deviceInfo?.purpose === 'MESS' && !mealWindow ? (
                 <>
-                  <span className="text-amber-400 font-bold">MESS SERVICE STANDBY</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-slate-400">NO MEAL CURRENTLY SERVING</span>
+                  <span className="text-[#B7791F]">Dining counter standby</span>
+                  <span className="text-[#E4E1DA]">•</span>
+                  <span className="text-[#5B6472]">No meal currently serving</span>
                 </>
               ) : (
                 <>
-                  <span>DYNAMIC ONE-TIME QR CODE</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-slate-400">{ttlTotal}s ANTI-PROXY CYCLE</span>
+                  <span>Dynamic one-time QR code</span>
+                  <span className="text-[#E4E1DA]">•</span>
+                  <span className="text-[#5B6472]">{ttlTotal}s anti-proxy cycle</span>
                 </>
               )}
             </div>
 
-            {/* QR Card Container */}
-            <div className="relative p-6 sm:p-8 bg-slate-900/95 border-2 border-slate-700/80 rounded-3xl shadow-2xl shadow-sky-950/40 backdrop-blur-2xl flex flex-col items-center">
-              {/* Corner accent brackets for futuristic kiosk aesthetic */}
-              <div className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-sky-400 rounded-tl-sm pointer-events-none" />
-              <div className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-sky-400 rounded-tr-sm pointer-events-none" />
-              <div className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-sky-400 rounded-bl-sm pointer-events-none" />
-              <div className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-sky-400 rounded-br-sm pointer-events-none" />
+            {/* Main Institutional Pedestal Card */}
+            <div className="bg-white border border-[#E4E1DA] rounded-xl p-6 sm:p-8 shadow-sm flex flex-col items-center w-full">
+              {/* Standby Schedule or Active QR Code */}
+              {deviceInfo?.purpose === 'MESS' && !mealWindow ? (
+                <div className="w-full flex flex-col items-center text-center">
+                  <div className="w-12 h-12 rounded-full bg-[#B7791F]/10 border border-[#B7791F]/20 text-[#B7791F] flex items-center justify-center mb-3">
+                    <Utensils className="w-5 h-5" strokeWidth={1.5} />
+                  </div>
+                  <h2 className="font-serif text-lg font-medium text-[#1C2430] mb-1">
+                    Dining Counter on Standby
+                  </h2>
+                  <p className="text-xs text-[#5B6472] mb-4">
+                    {nextMealWindow
+                      ? `Next: ${nextMealWindow.meal_type} (${nextMealWindow.start_time} - ${nextMealWindow.end_time})`
+                      : 'No meal window scheduled right now'}
+                  </p>
 
-              {/* QR Canvas / SVG or Mess Standby Box */}
-              <div className="bg-white p-5 rounded-2xl shadow-inner flex items-center justify-center transition-all duration-300">
-                {deviceInfo?.purpose === 'MESS' && !mealWindow ? (
-                  <div className="w-56 h-56 sm:w-72 sm:h-72 flex flex-col items-center justify-center p-3 text-center bg-slate-950 rounded-2xl border border-amber-500/20 text-white">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-2">
-                      <Utensils className="w-5 h-5" />
+                  <div className="w-full bg-[#FAF9F6] border border-[#E4E1DA] rounded-lg p-3.5 text-xs mb-4">
+                    <div className="text-[11px] font-medium text-[#1C2430] uppercase tracking-wider mb-2.5 pb-1.5 border-b border-[#E4E1DA] flex justify-between">
+                      <span>Official Dining Schedule</span>
+                      <span className="text-[10px] text-[#5B6472] font-normal">Council of Wardens</span>
                     </div>
-                    <div className="text-xs font-bold text-amber-300 uppercase tracking-wider mb-1">
-                      Counter Standby
-                    </div>
-                    <p className="text-[11px] text-slate-400 mb-2">
-                      {nextMealWindow
-                        ? `Next: ${nextMealWindow.meal_type} (${nextMealWindow.start_time} - ${nextMealWindow.end_time})`
-                        : 'No meal window scheduled right now'}
-                    </p>
-                    <div className="w-full bg-slate-900/90 rounded-lg p-2 text-[10px] text-slate-300 space-y-0.5 border border-slate-800 text-left">
+                    <div className="space-y-2 text-xs">
                       {allMealWindows.length > 0 ? (
                         allMealWindows.map((w) => (
-                          <div key={w.id} className="flex justify-between">
-                            <span className="capitalize">{w.meal_type.toLowerCase()}</span>
-                            <span className="font-mono">{w.start_time} - {w.end_time}</span>
+                          <div key={w.id} className="flex justify-between items-center py-0.5 border-b border-[#E4E1DA]/50 last:border-0">
+                            <span className="capitalize font-medium text-[#1C2430]">{w.meal_type.toLowerCase()}</span>
+                            <span className="font-mono text-[#5B6472] tabular-nums">{w.start_time} - {w.end_time}</span>
                           </div>
                         ))
                       ) : (
                         <>
-                          <div className="flex justify-between"><span>Breakfast</span><span className="font-mono">07:30 - 09:30</span></div>
-                          <div className="flex justify-between"><span>Lunch</span><span className="font-mono">12:30 - 14:30</span></div>
-                          <div className="flex justify-between"><span>Snacks</span><span className="font-mono">17:00 - 18:30</span></div>
-                          <div className="flex justify-between"><span>Dinner</span><span className="font-mono">20:00 - 22:00</span></div>
+                          <div className="flex justify-between items-center py-0.5 border-b border-[#E4E1DA]/50">
+                            <span className="font-medium text-[#1C2430]">Breakfast</span>
+                            <span className="font-mono text-[#5B6472] tabular-nums">07:30 - 09:30</span>
+                          </div>
+                          <div className="flex justify-between items-center py-0.5 border-b border-[#E4E1DA]/50">
+                            <span className="font-medium text-[#1C2430]">Lunch</span>
+                            <span className="font-mono text-[#5B6472] tabular-nums">12:30 - 14:30</span>
+                          </div>
+                          <div className="flex justify-between items-center py-0.5 border-b border-[#E4E1DA]/50">
+                            <span className="font-medium text-[#1C2430]">Snacks</span>
+                            <span className="font-mono text-[#5B6472] tabular-nums">17:00 - 18:30</span>
+                          </div>
+                          <div className="flex justify-between items-center py-0.5 last:border-0">
+                            <span className="font-medium text-[#1C2430]">Dinner</span>
+                            <span className="font-mono text-[#5B6472] tabular-nums">20:00 - 22:00</span>
+                          </div>
                         </>
                       )}
                     </div>
                   </div>
-                ) : qrToken ? (
-                  <div className="flex flex-col items-center">
+
+                  <p className="text-[11px] text-[#5B6472]">
+                    QR code activates automatically when the scheduled meal window opens.
+                  </p>
+                </div>
+              ) : qrToken ? (
+                <div className="flex flex-col items-center">
+                  <div className="p-4 bg-white rounded-lg border border-[#E4E1DA] shadow-xs">
                     <QRCodeSVG
                       value={qrToken}
-                      size={280}
+                      size={260}
                       level="H"
                       includeMargin={false}
-                      className="w-56 h-56 sm:w-72 sm:h-72 transition-opacity duration-300"
+                      className="w-56 h-56 sm:w-64 sm:h-64 transition-opacity duration-300"
                     />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(qrToken);
-                        setCopiedToken(true);
-                        setTimeout(() => setCopiedToken(false), 2500);
-                      }}
-                      className="mt-3 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-sky-300 text-xs font-mono border border-slate-700/60 flex items-center gap-1.5 transition"
-                      title="Copy active token string for manual testing in Student App"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-sky-400" />
-                      <span>{copiedToken ? '✓ Copied to Clipboard!' : 'Copy Token (Test on Student App)'}</span>
-                    </button>
                   </div>
-                ) : (
-                  <div className="w-56 h-56 sm:w-72 sm:h-72 flex flex-col items-center justify-center text-slate-400">
-                    <RefreshCw className="w-8 h-8 animate-spin text-sky-500 mb-2" />
-                    <span className="text-xs font-medium">Generating QR...</span>
-                  </div>
-                )}
-              </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrToken);
+                      setCopiedToken(true);
+                      setTimeout(() => setCopiedToken(false), 2500);
+                    }}
+                    className="mt-3 px-3 py-1.5 rounded bg-[#FAF9F6] hover:bg-[#F2EFE9] text-[#5B6472] hover:text-[#1C2430] text-xs font-mono border border-[#E4E1DA] flex items-center gap-1.5 transition cursor-pointer"
+                    title="Copy active token string for manual testing in Student App"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-[#26415C]" />
+                    <span>{copiedToken ? '✓ Copied to clipboard' : 'Copy test token'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="w-56 h-56 sm:w-64 sm:h-64 flex flex-col items-center justify-center text-[#5B6472]">
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#26415C] mb-2" />
+                  <span className="text-xs font-medium">Generating dynamic QR...</span>
+                </div>
+              )}
 
               {/* Scanning Instructions */}
-              <div className="mt-6 text-center">
-                <div className="text-base font-bold text-white tracking-wide flex items-center justify-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-sky-400" />
+              <div className="mt-6 text-center max-w-sm">
+                <div className="text-sm font-serif font-medium text-[#1C2430] flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[#2E7D5B]" strokeWidth={2} />
                   <span>
                     {deviceInfo?.purpose === 'MESS'
                       ? mealWindow
                         ? `Scan with Student App for ${mealWindow.meal_type}`
-                        : 'Mess Counter on Standby'
+                        : 'Dining counter standby'
                       : 'Scan with HOSTEL360 Student App'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-[#5B6472] mt-1 leading-relaxed">
                   {deviceInfo?.purpose === 'MESS' && !mealWindow
-                    ? 'QR code activates automatically when next meal service opens'
-                    : 'Point camera at screen • Authenticated scans record attendance instantly'}
+                    ? 'Attendance recording opens automatically during active meal hours'
+                    : 'Open camera scanner on your mobile • Attendance is authenticated and recorded in real time'}
                 </p>
               </div>
 
               {/* Progress & Countdown Bar */}
-              <div className="w-full mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between gap-4">
+              <div className="w-full mt-6 pt-5 border-t border-[#E4E1DA] flex items-center justify-between gap-3">
                 {/* Visual Circular / Pill Timer */}
-                <div className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border text-xs font-bold transition-colors ${timerColor}`}>
-                  <Clock className={`w-3.5 h-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-                  <span>
-                    {isRotating ? 'Rotating...' : `Rotates in ${secondsLeft}s`}
-                  </span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#FAF9F6] border border-[#E4E1DA] text-xs font-mono text-[#1C2430]">
+                  <Clock className={`w-3.5 h-3.5 text-[#26415C] ${isRotating ? 'animate-spin' : ''}`} />
+                  <span>{isRotating ? 'Rotating...' : `${secondsLeft}s`}</span>
                 </div>
 
                 {/* Progress bar line */}
-                <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden p-0.5">
+                <div className="flex-1 h-1.5 bg-[#FAF9F6] border border-[#E4E1DA] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000 ease-linear"
                     style={{
                       width: `${percentLeft}%`,
-                      backgroundColor: strokeColor,
+                      backgroundColor: isUrgent ? '#B3432B' : isWarning ? '#B7791F' : '#26415C',
                     }}
                   />
                 </div>
 
-                {/* Refresh Trigger Button */}
+                {/* Force Refresh Trigger */}
                 <button
                   onClick={() => fetchNextQrToken()}
                   disabled={isRotating}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition disabled:opacity-50"
-                  title="Force Rotate Now"
+                  className="p-1.5 rounded bg-white hover:bg-[#FAF9F6] text-[#5B6472] hover:text-[#1C2430] transition border border-[#E4E1DA] disabled:opacity-50 cursor-pointer"
+                  title="Force rotate new QR code"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRotating ? 'animate-spin' : ''}`} />
                 </button>
@@ -608,45 +633,45 @@ export const KioskDisplayPage: React.FC = () => {
       </main>
 
       {/* FOOTER BAR */}
-      <footer className="px-6 py-3 border-t border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 z-10 gap-2">
-        <div className="flex items-center gap-3">
-          <span>Terminal ID: <code className="text-slate-400">{deviceInfo?.device_code || deviceId}</code></span>
-          <span>•</span>
-          <span>Type: <strong className="text-slate-300">{deviceInfo?.purpose || 'GATE'}</strong></span>
-          <span>•</span>
-          <span>Security: <strong className="text-emerald-400">SHA-256 OPAQUE</strong></span>
+      <footer className="px-4 sm:px-6 py-3 border-t border-[#E4E1DA] bg-white flex flex-col sm:flex-row items-center justify-between text-xs text-[#5B6472] z-10 gap-2">
+        <div className="flex items-center gap-2.5">
+          <span>Terminal ID: <code className="font-mono text-[#1C2430]">{deviceInfo?.device_code || deviceId}</code></span>
+          <span className="text-[#E4E1DA]">•</span>
+          <span>Type: <strong className="text-[#1C2430] font-medium">{deviceInfo?.purpose || 'GATE'}</strong></span>
+          <span className="text-[#E4E1DA]">•</span>
+          <span>Security: <strong className="text-[#2E7D5B] font-medium">SHA-256 HMAC Opaque</strong></span>
         </div>
         <div className="flex items-center gap-3">
-          <span>HOSTEL360 v1.0 Production Engine</span>
-          <span>•</span>
+          <span>Council of Wardens • MANIT Bhopal</span>
+          <span className="text-[#E4E1DA]">•</span>
           <button
-            onClick={() => navigate('/dashboard')}
-            className="text-slate-400 hover:text-sky-400 underline transition"
+            onClick={handleExit}
+            className="text-[#26415C] hover:underline font-medium cursor-pointer"
           >
-            Back to Dashboard
+            Exit Kiosk
           </button>
         </div>
       </footer>
 
       {/* ANTI-PROXY CONFIRMATION FLASH MODAL (5s Visual Verification) */}
       {confirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
-          <div className="relative max-w-lg w-full bg-gradient-to-b from-slate-900 to-slate-950 border-4 border-emerald-500 rounded-3xl p-8 shadow-2xl shadow-emerald-500/30 text-center flex flex-col items-center">
-            {/* Top Success Badge */}
-            <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 mb-4 shadow-lg animate-bounce">
-              <CheckCircle2 className="w-12 h-12" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C2430]/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative max-w-sm w-full bg-white border-2 border-[#2E7D5B] rounded-xl p-6 shadow-2xl text-center flex flex-col items-center">
+            {/* Top Success Icon */}
+            <div className="w-12 h-12 rounded-full bg-[#2E7D5B]/10 border border-[#2E7D5B]/20 text-[#2E7D5B] flex items-center justify-center mb-3">
+              <CheckCircle2 className="w-7 h-7" />
             </div>
 
-            <div className="inline-block px-4 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-extrabold text-sm tracking-wider uppercase mb-4">
+            <div className="inline-block px-3 py-0.5 rounded bg-[#2E7D5B]/10 border border-[#2E7D5B]/20 text-[#2E7D5B] font-medium text-xs tracking-wider uppercase mb-3">
               {confirmation.direction
-                ? `${confirmation.direction} CONFIRMED`
+                ? `${confirmation.direction} confirmed`
                 : confirmation.mealType
-                ? `${confirmation.mealType} RECORDED`
-                : 'ATTENDANCE CONFIRMED'}
+                ? `${confirmation.mealType} attendance recorded`
+                : 'Attendance confirmed'}
             </div>
 
             {/* Student Photo */}
-            <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-slate-700 shadow-xl mb-4 bg-slate-800">
+            <div className="w-24 h-24 rounded-lg overflow-hidden border border-[#E4E1DA] bg-[#FAF9F6] shadow-xs mb-3">
               {confirmation.photoUrl ? (
                 <img
                   src={confirmation.photoUrl}
@@ -654,27 +679,27 @@ export const KioskDisplayPage: React.FC = () => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 text-3xl font-bold bg-slate-800">
+                <div className="w-full h-full flex items-center justify-center text-[#5B6472] text-2xl font-serif bg-[#FAF9F6]">
                   {confirmation.studentName?.charAt(0) || 'S'}
                 </div>
               )}
             </div>
 
             {/* Student Details */}
-            <h2 className="text-2xl font-black text-white tracking-tight">
+            <h2 className="font-serif text-lg font-medium text-[#1C2430]">
               {confirmation.studentName}
             </h2>
-            <p className="text-lg font-mono font-semibold text-emerald-400 mt-1">
+            <p className="font-mono text-sm font-medium text-[#26415C] mt-0.5 tabular-nums">
               {confirmation.rollNumber}
             </p>
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-[11px] text-[#5B6472] mt-1.5">
               Verified at {confirmation.timestamp || currentTime}
             </p>
 
-            {/* 5-second countdown pill */}
-            <div className="mt-6 text-xs text-slate-400 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Anti-proxy verification auto-dismisses in 5s...</span>
+            {/* 5-second countdown note */}
+            <div className="mt-4 text-[11px] text-[#5B6472] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D5B] animate-pulse" />
+              <span>Anti-proxy confirmation • Auto-dismisses in 5s</span>
             </div>
           </div>
         </div>
@@ -682,75 +707,75 @@ export const KioskDisplayPage: React.FC = () => {
 
       {/* CONFIGURATION / SECRET SETUP MODAL */}
       {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-left">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C2430]/60 backdrop-blur-sm">
+          <div className="max-w-md w-full bg-white border border-[#E4E1DA] rounded-xl p-6 shadow-xl text-left">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center border border-sky-500/20">
-                  <KeyRound className="w-5 h-5" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded bg-[#26415C]/10 text-[#26415C] flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Configure Kiosk Secret</h3>
-                  <p className="text-xs text-slate-400">Terminal Authentication Setup</p>
+                  <h3 className="font-serif text-base font-medium text-[#1C2430]">Configure Kiosk Secret</h3>
+                  <p className="text-xs text-[#5B6472]">Terminal authentication credentials</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1 rounded hover:bg-[#FAF9F6] text-[#5B6472] hover:text-[#1C2430] cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSaveSecret} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-[#1C2430] mb-1">
                   Device ID or Code
                 </label>
                 <input
                   type="text"
                   value={deviceId}
                   disabled
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 text-sm font-mono"
+                  className="w-full px-3 py-2 bg-[#FAF9F6] border border-[#E4E1DA] rounded text-[#5B6472] text-xs font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  32-Byte Secret Key (Hex)
+                <label className="block text-xs font-medium text-[#1C2430] mb-1">
+                  32-Byte Secret Key (Hex or alphanumeric)
                 </label>
                 <input
                   type="password"
                   placeholder="Paste device secret generated during registration..."
                   value={secretInput}
                   onChange={(e) => setSecretInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl text-white text-sm font-mono placeholder:text-slate-600 focus:outline-none"
+                  className="w-full px-3 py-2 bg-white border border-[#E4E1DA] focus:border-[#26415C] rounded text-[#1C2430] text-xs font-mono placeholder:text-[#5B6472]/60 focus:outline-none"
                   autoFocus
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Stored securely in kiosk browser localStorage. Never transmitted to 3rd parties.
+                <p className="text-[11px] text-[#5B6472] mt-1">
+                  Stored securely in browser localStorage. Never transmitted to third parties.
                 </p>
               </div>
 
               {configError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                <div className="p-2.5 rounded bg-[#B3432B]/10 border border-[#B3432B]/20 text-[#B3432B] text-xs">
                   {configError}
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 font-semibold text-sm transition"
+                  className="flex-1 py-2 rounded border border-[#E4E1DA] bg-white text-[#1C2430] hover:bg-[#FAF9F6] font-medium text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition shadow-lg shadow-sky-600/30"
+                  className="flex-1 py-2 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs transition cursor-pointer"
                 >
-                  Save & Launch
+                  Save and activate
                 </button>
               </div>
             </form>

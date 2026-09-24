@@ -1,7 +1,8 @@
 import prisma from '../prisma.js';
 import { z } from 'zod';
+import { getUserHostelIds, userHasHostelAccess } from '../utils/roleScoping.js';
 
-// Zod schemas
+// Zod schemas — warden_id removed (staff assignments are separate)
 const createHostelSchema = z.object({
   code: z.string().min(1).max(10),
   name: z.string().min(1).max(120),
@@ -9,7 +10,6 @@ const createHostelSchema = z.object({
   location: z.string().min(1).max(255),
   total_capacity: z.number().int().positive(),
   has_blocks: z.boolean().optional().default(false),
-  warden_id: z.string().uuid().optional().nullable(),
 });
 
 const updateHostelSchema = z.object({
@@ -19,23 +19,25 @@ const updateHostelSchema = z.object({
   location: z.string().min(1).max(255).optional(),
   total_capacity: z.number().int().positive().optional(),
   has_blocks: z.boolean().optional(),
-  warden_id: z.string().uuid().optional().nullable(),
 });
 
 // 4.1 List all hostels
 export async function listHostels(req, res) {
   try {
-    // Wardens see only their assigned hostels
+    // Scope by staff hostel assignments for non-super-admins
+    const hostelIds = getUserHostelIds(req.user);
     const where = {};
-    if (req.user.role === 'WARDEN') {
-      where.warden_id = req.user.id;
+    if (hostelIds !== null) {
+      where.id = { in: hostelIds };
     }
 
     const hostels = await prisma.hostel.findMany({
       where,
       include: {
-        warden: {
-          select: { id: true, name: true, email: true },
+        staff_hostel_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         _count: {
           select: { students: true, rooms: true, gates: true },
@@ -59,19 +61,13 @@ export async function createHostel(req, res) {
       return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten().fieldErrors });
     }
 
-    // Validate warden_id if provided
-    if (parsed.data.warden_id) {
-      const warden = await prisma.user.findUnique({ where: { id: parsed.data.warden_id } });
-      if (!warden || warden.role !== 'WARDEN') {
-        return res.status(400).json({ error: 'Invalid warden_id: user not found or not a WARDEN' });
-      }
-    }
-
     const hostel = await prisma.hostel.create({
       data: parsed.data,
       include: {
-        warden: {
-          select: { id: true, name: true, email: true },
+        staff_hostel_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
       },
     });
@@ -106,8 +102,10 @@ export async function getHostel(req, res) {
     const hostel = await prisma.hostel.findUnique({
       where: { id },
       include: {
-        warden: {
-          select: { id: true, name: true, email: true },
+        staff_hostel_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         rooms: {
           orderBy: { room_number: 'asc' },
@@ -132,9 +130,9 @@ export async function getHostel(req, res) {
       return res.status(404).json({ error: 'Hostel not found' });
     }
 
-    // Wardens can only access their own hostels
-    if (req.user.role === 'WARDEN' && hostel.warden_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied: you are not the warden of this hostel' });
+    // Staff can only access their assigned hostels
+    if (!userHasHostelAccess(req.user, hostel.id)) {
+      return res.status(403).json({ error: 'Access denied: you are not assigned to this hostel' });
     }
 
     return res.json({ hostel });
@@ -158,20 +156,14 @@ export async function updateHostel(req, res) {
       return res.status(404).json({ error: 'Hostel not found' });
     }
 
-    // Validate warden_id if provided
-    if (parsed.data.warden_id) {
-      const warden = await prisma.user.findUnique({ where: { id: parsed.data.warden_id } });
-      if (!warden || warden.role !== 'WARDEN') {
-        return res.status(400).json({ error: 'Invalid warden_id: user not found or not a WARDEN' });
-      }
-    }
-
     const hostel = await prisma.hostel.update({
       where: { id },
       data: parsed.data,
       include: {
-        warden: {
-          select: { id: true, name: true, email: true },
+        staff_hostel_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         _count: {
           select: { students: true, rooms: true, gates: true },

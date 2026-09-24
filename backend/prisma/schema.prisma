@@ -10,6 +10,8 @@ datasource db {
 enum Role {
   STUDENT
   WARDEN
+  VICE_WARDEN
+  CARETAKER
   MESS_ADMIN
   SUPER_ADMIN
 }
@@ -76,11 +78,11 @@ model User {
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 
-  student            Student?
-  warden_hostels     Hostel[]       @relation("WardenHostels")
-  mess_admin_messes  Mess[]         @relation("MessAdminMesses")
-  registered_devices Device[]       @relation("UserRegisteredDevices")
-  refresh_tokens     RefreshToken[]
+  student                 Student?
+  staff_hostel_assignments StaffHostelAssignment[]
+  staff_mess_assignments   StaffMessAssignment[]
+  registered_devices       Device[]       @relation("UserRegisteredDevices")
+  refresh_tokens           RefreshToken[]
 
   @@map("users")
 }
@@ -116,16 +118,15 @@ model Hostel {
   has_blocks     Boolean    @default(false)
   location       String     @db.VarChar(255)
   total_capacity Int
-  warden_id      String?
-  warden         User?      @relation("WardenHostels", fields: [warden_id], references: [id], onDelete: SetNull)
   created_at     DateTime   @default(now())
   updated_at     DateTime   @updatedAt
 
-  rooms             Room[]
-  gates             Gate[]
-  students          Student[]
-  messes            Mess[]
-  hostel_attendance HostelAttendance[]
+  rooms                    Room[]
+  gates                    Gate[]
+  students                 Student[]
+  messes                   Mess[]
+  hostel_attendance        HostelAttendance[]
+  staff_hostel_assignments StaffHostelAssignment[]
 
   @@map("hostels")
 }
@@ -136,14 +137,14 @@ model Room {
   hostel      Hostel     @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
   block       String?    @db.VarChar(2)
   floor       Int        @default(0)
-  room_number String     @unique @db.VarChar(10)
+  room_number String     @db.VarChar(10)
   capacity    Int        @default(2)
   status      RoomStatus @default(ACTIVE)
   created_at  DateTime   @default(now())
 
   students Student[]
 
-  @@unique([hostel_id, room_number])
+  @@unique([hostel_id, block, room_number])
   @@map("rooms")
 }
 
@@ -189,14 +190,13 @@ model Mess {
   name          String   @unique @db.VarChar(120)
   hostel_id     String?
   hostel        Hostel?  @relation(fields: [hostel_id], references: [id], onDelete: SetNull)
-  mess_admin_id String?
-  mess_admin    User?    @relation("MessAdminMesses", fields: [mess_admin_id], references: [id], onDelete: SetNull)
   created_at    DateTime @default(now())
 
-  meal_windows    MealWindow[]
-  devices         Device[]
-  qr_tokens       QrToken[]
-  mess_attendance MessAttendance[]
+  meal_windows           MealWindow[]
+  devices                Device[]
+  qr_tokens              QrToken[]
+  mess_attendance        MessAttendance[]
+  staff_mess_assignments StaffMessAssignment[]
 
   @@map("messes")
 }
@@ -303,9 +303,41 @@ model AuditLog {
   action      String    @db.VarChar(120)
   target_type String?   @db.VarChar(60)
   target_id   String?
+  reason      String?   @db.Text
   meta        Json?
   created_at  DateTime  @default(now())
 
   @@index([created_at])
   @@map("audit_logs")
+}
+
+// --- Staff Assignment Tables ---
+
+model StaffHostelAssignment {
+  id          String   @id @default(uuid())
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  hostel_id   String
+  hostel      Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  role        Role
+  is_primary  Boolean  @default(false)
+  assigned_at DateTime @default(now())
+
+  @@unique([user_id, hostel_id])
+  @@index([hostel_id])
+  @@map("staff_hostel_assignments")
+}
+
+model StaffMessAssignment {
+  id          String   @id @default(uuid())
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  mess_id     String
+  mess        Mess     @relation(fields: [mess_id], references: [id], onDelete: Cascade)
+  role        Role
+  assigned_at DateTime @default(now())
+
+  @@unique([user_id, mess_id])
+  @@index([mess_id])
+  @@map("staff_mess_assignments")
 }

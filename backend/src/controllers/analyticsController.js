@@ -1,4 +1,5 @@
 import prisma from '../prisma.js';
+import { getUserHostelIds, getUserMessIds } from '../utils/roleScoping.js';
 
 /**
  * 10.1 GET /api/analytics/occupancy-history
@@ -12,18 +13,15 @@ export async function getOccupancyHistory(req, res) {
 
     let targetHostelId = hostel_id;
 
-    if (req.user.role === 'WARDEN') {
-      const wardenHostels = await prisma.hostel.findMany({
-        where: { warden_id: req.user.id },
-        select: { id: true, name: true, total_capacity: true },
-      });
-      if (wardenHostels.length === 0) {
-        return res.status(403).json({ error: 'No hostels assigned to your warden account' });
+    if (['WARDEN', 'VICE_WARDEN', 'CARETAKER'].includes(req.user.role)) {
+      const hostelIds = getUserHostelIds(req.user);
+      if (!hostelIds || hostelIds.length === 0) {
+        return res.status(403).json({ error: 'No hostels assigned to your account' });
       }
       if (!targetHostelId) {
-        targetHostelId = wardenHostels[0].id;
+        targetHostelId = hostelIds[0];
       } else {
-        const hasAccess = wardenHostels.some((h) => h.id === targetHostelId);
+        const hasAccess = hostelIds.includes(targetHostelId);
         if (!hasAccess) {
           return res.status(403).json({ error: 'Access denied: you do not manage this hostel' });
         }
@@ -140,17 +138,14 @@ export async function getMealTrends(req, res) {
     let targetMessId = mess_id;
 
     if (req.user.role === 'MESS_ADMIN') {
-      const userMesses = await prisma.mess.findMany({
-        where: { mess_admin_id: req.user.id },
-        select: { id: true, name: true },
-      });
-      if (userMesses.length === 0) {
+      const messIds = getUserMessIds(req.user);
+      if (!messIds || messIds.length === 0) {
         return res.status(403).json({ error: 'No messes assigned to your admin account' });
       }
       if (!targetMessId) {
-        targetMessId = userMesses[0].id;
+        targetMessId = messIds[0];
       } else {
-        const hasAccess = userMesses.some((m) => m.id === targetMessId);
+        const hasAccess = messIds.includes(targetMessId);
         if (!hasAccess) {
           return res.status(403).json({ error: 'Access denied: you do not manage this mess' });
         }
@@ -263,12 +258,9 @@ export async function exportReport(req, res) {
 
     if (type === 'hostel_attendance') {
       const where = { scanned_at: { gte: startDate } };
-      if (req.user.role === 'WARDEN') {
-        const wardenHostels = await prisma.hostel.findMany({
-          where: { warden_id: req.user.id },
-          select: { id: true },
-        });
-        where.hostel_id = { in: wardenHostels.map((h) => h.id) };
+      if (['WARDEN', 'VICE_WARDEN', 'CARETAKER'].includes(req.user.role)) {
+        const hostelIds = getUserHostelIds(req.user);
+        if (hostelIds) where.hostel_id = { in: hostelIds };
       } else if (hostel_id) {
         where.hostel_id = hostel_id;
       }
@@ -313,11 +305,8 @@ export async function exportReport(req, res) {
     if (type === 'mess_attendance') {
       const where = { date: { gte: startDate } };
       if (req.user.role === 'MESS_ADMIN') {
-        const userMesses = await prisma.mess.findMany({
-          where: { mess_admin_id: req.user.id },
-          select: { id: true },
-        });
-        where.mess_id = { in: userMesses.map((m) => m.id) };
+        const messIds = getUserMessIds(req.user);
+        if (messIds) where.mess_id = { in: messIds };
       } else if (mess_id) {
         where.mess_id = mess_id;
       }

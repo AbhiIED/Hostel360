@@ -1,23 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import api from '../api/client';
 import jsQR from 'jsqr';
+import api from '../api/client';
 import {
   Camera,
-  History,
   QrCode,
-  ShieldCheck,
-  Building,
-  DoorOpen,
+  History,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ArrowRightLeft,
-  LogIn,
-  LogOut,
-  Utensils,
-  VideoOff,
+  Building,
+  DoorOpen,
   User,
-  Clock,
+  Utensils,
+  FlipHorizontal,
+  VideoOff,
   ClipboardPaste,
 } from 'lucide-react';
 
@@ -27,25 +23,20 @@ interface StudentProfile {
   gender: string;
   department?: string;
   year?: number;
-  photo_url?: string;
   current_state: 'INSIDE' | 'OUTSIDE';
+  photo_url?: string;
   user: {
-    id: string;
     name: string;
     email: string;
   };
   hostel?: {
     id: string;
-    code: string;
     name: string;
-    type: string;
-    location: string;
+    code: string;
   };
   room?: {
     id: string;
     room_number: string;
-    floor: number;
-    block?: string;
   };
 }
 
@@ -53,28 +44,22 @@ interface HostelAttendanceLog {
   id: string;
   direction: 'ENTRY' | 'EXIT';
   scanned_at: string;
-  gate: {
-    id: string;
+  gate?: {
     name: string;
   };
-  hostel: {
-    id: string;
+  hostel?: {
     name: string;
-    code: string;
   };
 }
 
 interface MessAttendanceLog {
   id: string;
   meal_type: string;
-  date: string;
   scanned_at: string;
-  mess: {
-    id: string;
+  mess?: {
     name: string;
   };
-  meal_window: {
-    id: string;
+  meal_window?: {
     meal_type: string;
     start_time: string;
     end_time: string;
@@ -87,10 +72,10 @@ export const StudentAppPage: React.FC = () => {
   const [hostelLogs, setHostelLogs] = useState<HostelAttendanceLog[]>([]);
   const [messLogs, setMessLogs] = useState<MessAttendanceLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   // Scanner State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualToken, setManualToken] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -120,7 +105,6 @@ export const StudentAppPage: React.FC = () => {
       console.error('Error fetching student data:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -138,18 +122,29 @@ export const StudentAppPage: React.FC = () => {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setCameraActive(false);
   }, []);
 
-  // Submit token to backend
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  // Submit scanned token to backend
   const submitToken = async (rawToken: string) => {
     if (!rawToken || isScanning) return;
     setIsScanning(true);
-    setScanResult(null);
 
-    // Haptic vibration feedback
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate(150);
+      try {
+        navigator.vibrate([100, 50, 100]);
+      } catch {
+        /* ignore */
+      }
     }
 
     try {
@@ -171,17 +166,15 @@ export const StudentAppPage: React.FC = () => {
         }),
       });
 
-      // Update student profile state locally
       if (data.student_state) {
         setProfile((prev) => (prev ? { ...prev, current_state: data.student_state } : prev));
       }
 
-      // Refresh history records
       fetchStudentData();
       stopCamera();
     } catch (err: any) {
       console.error('Scan submission error:', err);
-      const errMsg = err.response?.data?.error || 'Failed to process QR scan. Please try again.';
+      const errMsg = err.response?.data?.error || 'Failed to process QR scan. Please verify alignment and try again.';
       setScanResult({
         success: false,
         message: errMsg,
@@ -191,14 +184,20 @@ export const StudentAppPage: React.FC = () => {
     }
   };
 
-  // Start Camera for scanning
   const startCamera = () => {
     setCameraError(null);
     setScanResult(null);
     setCameraActive(true);
   };
 
-  // Camera stream lifecycle effect
+  const toggleFacingMode = () => {
+    stopCamera();
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+    setTimeout(() => {
+      setCameraActive(true);
+    }, 150);
+  };
+
   useEffect(() => {
     if (!cameraActive) return;
 
@@ -208,11 +207,15 @@ export const StudentAppPage: React.FC = () => {
       setCameraError(null);
       try {
         if (!navigator?.mediaDevices?.getUserMedia) {
-          throw new Error('Camera access is not supported by your browser or secure context (HTTPS/localhost). Please use the manual token input below.');
+          throw new Error('Camera hardware access is not available in this browser context. Please use the manual token input.');
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: {
+            facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
         });
 
         if (!isMounted) {
@@ -229,7 +232,7 @@ export const StudentAppPage: React.FC = () => {
         }
       } catch (err: any) {
         console.error('Camera access error:', err);
-        setCameraError(err.message || 'Camera access denied or unavailable. Please use the manual token option below.');
+        setCameraError(err.message || 'Camera permission denied or camera is in use by another app.');
         setCameraActive(false);
       }
     }
@@ -238,11 +241,12 @@ export const StudentAppPage: React.FC = () => {
 
     return () => {
       isMounted = false;
-      stopCamera();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
-  }, [cameraActive, stopCamera]);
+  }, [cameraActive, facingMode]);
 
-  // QR Scanning Animation Loop with jsQR
   const tickScan = () => {
     if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(tickScan);
@@ -250,53 +254,63 @@ export const StudentAppPage: React.FC = () => {
     }
 
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    let canvas = canvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvasRef.current = canvas;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      animationFrameRef.current = requestAnimationFrame(tickScan);
+      return;
+    }
 
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
       inversionAttempts: 'dontInvert',
     });
 
-    if (code && code.data && code.data.trim().length > 0) {
-      // Detected a QR code!
-      submitToken(code.data.trim());
-      return; // Stop animation loop
+    if (code && code.data) {
+      const scannedData = code.data.trim();
+      let extractedToken = scannedData;
+
+      try {
+        if (scannedData.startsWith('{') && scannedData.endsWith('}')) {
+          const parsed = JSON.parse(scannedData);
+          if (parsed.token) extractedToken = parsed.token;
+        } else if (scannedData.includes('token=')) {
+          const urlObj = new URL(scannedData);
+          const tParam = urlObj.searchParams.get('token');
+          if (tParam) extractedToken = tParam;
+        }
+      } catch {
+        // use raw string
+      }
+
+      submitToken(extractedToken);
+      return;
     }
 
     animationFrameRef.current = requestAnimationFrame(tickScan);
   };
 
-  // Clean up camera on tab switch or unmount
-  useEffect(() => {
-    if (activeTab !== 'scan') {
-      stopCamera();
-    }
-  }, [activeTab, stopCamera]);
-
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (manualToken.trim()) {
-      submitToken(manualToken.trim());
-      setManualToken('');
-    }
+    if (!manualToken.trim()) return;
+    submitToken(manualToken.trim());
   };
 
   const handlePasteFromClipboard = async () => {
     try {
-      if (navigator.clipboard && navigator.clipboard.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text && text.trim()) {
-          setManualToken(text.trim());
-          submitToken(text.trim());
-        }
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        setManualToken(text.trim());
+        submitToken(text.trim());
       }
     } catch (e) {
       console.warn('Clipboard read failed:', e);
@@ -305,9 +319,9 @@ export const StudentAppPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center text-slate-400">
-        <RefreshCw className="w-8 h-8 animate-spin text-sky-500 mb-3" />
-        <p className="text-sm font-medium">Loading Student Profile...</p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-[#5B6472]">
+        <RefreshCw className="w-6 h-6 animate-spin text-[#26415C] mb-3" />
+        <p className="text-xs font-medium">Connecting to resident registry...</p>
       </div>
     );
   }
@@ -315,16 +329,14 @@ export const StudentAppPage: React.FC = () => {
   const isInside = profile?.current_state === 'INSIDE';
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
-      {/* 1. STUDENT IDENTITY & PERSISTED STATE CARD */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden mb-8">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 relative z-10">
-          <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      {/* 1. Student Identity and Campus Status Card */}
+      <div className="bg-white border border-[#E4E1DA] rounded-lg p-5 sm:p-6 mb-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left w-full sm:w-auto">
             {/* Student Photo */}
-            <div className="relative">
-              <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-700 bg-slate-800 shadow-md">
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 rounded border border-[#E4E1DA] bg-[#FAF9F6] overflow-hidden flex items-center justify-center">
                 {profile?.photo_url ? (
                   <img
                     src={profile.photo_url}
@@ -332,190 +344,138 @@ export const StudentAppPage: React.FC = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-500">
-                    <User className="w-8 h-8" />
-                  </div>
+                  <User className="w-8 h-8 text-[#5B6472]" />
                 )}
               </div>
-              <span
-                className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-slate-900 flex items-center justify-center ${
-                  isInside ? 'bg-emerald-500' : 'bg-amber-500'
-                }`}
-                title={isInside ? 'Inside Hostel' : 'Outside Hostel'}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              </span>
             </div>
 
-            {/* Student Info */}
-            <div>
-              <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                <h1 className="text-2xl font-black text-white tracking-tight">
+            {/* Student Details */}
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h1 className="font-serif text-xl sm:text-2xl font-medium text-[#1C2430] tracking-tight">
                   {profile?.user.name}
                 </h1>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 font-bold border border-sky-500/20">
-                  STUDENT
+                <span className="px-2 py-0.5 rounded bg-[#FAF9F6] border border-[#E4E1DA] text-[#5B6472] text-[11px] font-medium">
+                  Student resident
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-xs text-slate-400">
-                <span>Roll: <strong className="text-slate-200 font-mono">{profile?.roll_number}</strong></span>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-2.5 text-xs text-[#5B6472]">
+                <span>Roll: <strong className="text-[#1C2430] font-mono tabular-nums">{profile?.roll_number}</strong></span>
                 <span>•</span>
-                <span>Dept: <strong className="text-slate-200">{profile?.department || 'MANIT'}</strong></span>
+                <span>Dept: <strong className="text-[#1C2430]">{profile?.department || 'MANIT Bhopal'}</strong></span>
                 <span>•</span>
-                <span>Year: <strong className="text-slate-200">{profile?.year || '1st'}</strong></span>
+                <span>Year: <strong className="text-[#1C2430] tabular-nums">{profile?.year ? `Year ${profile.year}` : 'Undergraduate'}</strong></span>
               </div>
 
-              {/* Bound Hostel & Room */}
-              <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 text-xs text-slate-300">
-                <div className="flex items-center gap-1.5">
-                  <Building className="w-3.5 h-3.5 text-sky-400" />
-                  <span>{profile?.hostel?.name || 'Assigned Hostel'}</span>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 text-xs text-[#5B6472]">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FAF9F6] border border-[#E4E1DA]">
+                  <Building className="w-3.5 h-3.5 text-[#26415C]" strokeWidth={1.5} />
+                  <span>{profile?.hostel?.name || 'Assigned hostel'}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <DoorOpen className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Room: <strong className="font-mono text-white">{profile?.room?.room_number || 'N/A'}</strong></span>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FAF9F6] border border-[#E4E1DA]">
+                  <DoorOpen className="w-3.5 h-3.5 text-[#26415C]" strokeWidth={1.5} />
+                  <span>Room: <strong className="font-mono text-[#1C2430] tabular-nums">{profile?.room?.room_number || 'N/A'}</strong></span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Current State Indicator Badge */}
-          <div className="flex flex-col items-center sm:items-end">
-            <div
-              className={`px-4 py-2 rounded-2xl border flex items-center gap-2.5 shadow-lg ${
-                isInside
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-emerald-500/10'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-amber-500/10'
-              }`}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full ${isInside ? 'bg-emerald-400' : 'bg-amber-400'} animate-ping`} />
-              <div className="text-left sm:text-right">
-                <div className="text-[10px] font-bold tracking-wider uppercase opacity-80">
-                  Current Status
-                </div>
-                <div className="text-sm font-extrabold tracking-wide">
-                  {isInside ? 'INSIDE HOSTEL' : 'OUTSIDE HOSTEL'}
-                </div>
-              </div>
+          {/* Current Status Pill */}
+          <div className="w-full sm:w-auto flex flex-col items-center sm:items-end pt-2 sm:pt-0">
+            <div className="px-3.5 py-1.5 rounded border border-[#E4E1DA] bg-[#FAF9F6] flex items-center gap-2">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: isInside ? '#2E7D5B' : '#B7791F' }}
+              />
+              <span className="text-xs font-medium text-[#1C2430]">
+                {isInside ? 'Inside hostel' : 'Outside hostel'}
+              </span>
             </div>
-
-            <p className="text-[11px] text-slate-400 mt-2 text-center sm:text-right">
-              Next gate scan will trigger:{' '}
-              <strong className={isInside ? 'text-amber-400' : 'text-emerald-400'}>
-                {isInside ? 'EXIT' : 'ENTRY'}
-              </strong>
+            <p className="text-[11px] text-[#5B6472] mt-1.5 text-center sm:text-right">
+              Next scan records {isInside ? 'exit' : 'entry'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* 2. NAVIGATION TABS */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-6">
+      {/* 2. Lean Segmented Tab Navigation */}
+      <div className="flex items-center gap-3 border-b border-[#E4E1DA] pb-2 mb-6 text-xs">
         <button
           onClick={() => setActiveTab('scan')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
             activeTab === 'scan'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
+              : 'text-[#5B6472] hover:text-[#1C2430]'
           }`}
         >
-          <Camera className="w-4 h-4" />
-          <span>QR Scanner</span>
+          <Camera className="w-3.5 h-3.5" />
+          <span>Camera scanner</span>
         </button>
 
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
             activeTab === 'history'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
+              : 'text-[#5B6472] hover:text-[#1C2430]'
           }`}
         >
-          <History className="w-4 h-4" />
-          <span>Entry/Exit Log ({hostelLogs.length})</span>
+          <History className="w-3.5 h-3.5" />
+          <span>Gate log ({hostelLogs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('mess')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
             activeTab === 'mess'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
+              : 'text-[#5B6472] hover:text-[#1C2430]'
           }`}
         >
-          <Utensils className="w-4 h-4" />
-          <span>Mess Attendance ({messLogs.length})</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setRefreshing(true);
-            fetchStudentData();
-          }}
-          disabled={refreshing}
-          className="ml-auto p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition disabled:opacity-50"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <Utensils className="w-3.5 h-3.5" />
+          <span>Dining log ({messLogs.length})</span>
         </button>
       </div>
 
-      {/* 3. TAB 1: SCANNER VIEW */}
+      {/* 3. Tab 1: Scanner View */}
       {activeTab === 'scan' && (
         <div className="space-y-6">
-          {/* Scan result banner */}
           {scanResult && (
             <div
-              className={`p-6 rounded-3xl border shadow-xl flex items-start gap-4 animate-in fade-in duration-300 ${
+              className={`p-4 rounded-lg border text-xs flex items-start gap-3 ${
                 scanResult.success
-                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-                  : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                  ? 'bg-[#2E7D5B]/5 border-[#2E7D5B]/20 text-[#2E7D5B]'
+                  : 'bg-[#B3432B]/5 border-[#B3432B]/20 text-[#B3432B]'
               }`}
             >
-              <div
-                className={`p-2.5 rounded-2xl border ${
-                  scanResult.success
-                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-                    : 'bg-rose-500/20 border-rose-500/30 text-rose-400'
-                }`}
-              >
-                {scanResult.success ? <CheckCircle2 className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+              <div className="shrink-0 mt-0.5">
+                {scanResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B]" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-[#B3432B]" />
+                )}
               </div>
-
               <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white">
-                    {scanResult.success ? 'Attendance Recorded!' : 'Scan Failed'}
-                  </h3>
+                <div className="flex items-center justify-between font-medium text-[#1C2430]">
+                  <span>{scanResult.success ? 'Attendance recorded' : 'Scan rejected'}</span>
                   {scanResult.timestamp && (
-                    <span className="text-xs font-mono text-slate-400">{scanResult.timestamp}</span>
+                    <span className="text-[11px] text-[#5B6472] font-mono tabular-nums">
+                      {scanResult.timestamp}
+                    </span>
                   )}
                 </div>
-
-                <p className="text-sm mt-1 opacity-90">{scanResult.message}</p>
-
+                <p className="mt-0.5 text-[#5B6472]">{scanResult.message}</p>
                 {scanResult.success && (
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                     {scanResult.direction && (
-                      <span
-                        className={`px-3 py-1 rounded-full border ${
-                          scanResult.direction === 'ENTRY'
-                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                            : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                        }`}
-                      >
-                        {scanResult.direction === 'ENTRY' ? 'ENTRY' : 'EXIT'} CONFIRMED
+                      <span className="px-2 py-0.5 rounded bg-white border border-[#E4E1DA] font-medium text-[#1C2430]">
+                        {scanResult.direction === 'ENTRY' ? 'Entry' : 'Exit'} recorded
                       </span>
                     )}
                     {scanResult.gate && (
-                      <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300">
+                      <span className="px-2 py-0.5 rounded bg-white border border-[#E4E1DA] text-[#5B6472]">
                         {scanResult.gate}
-                      </span>
-                    )}
-                    {scanResult.newState && (
-                      <span className="px-3 py-1 rounded-full bg-sky-500/20 border border-sky-500/30 text-sky-300">
-                        Status: {scanResult.newState}
                       </span>
                     )}
                   </div>
@@ -525,52 +485,48 @@ export const StudentAppPage: React.FC = () => {
           )}
 
           {/* Camera Viewfinder Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
+          <div className="bg-white border border-[#E4E1DA] rounded-lg p-6 sm:p-8 text-center">
             {cameraActive ? (
-              <div className="relative mx-auto max-w-sm rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-2xl bg-black">
-                <video ref={videoRef} className="w-full h-80 object-cover" />
+              <div className="relative mx-auto max-w-sm rounded border border-[#E4E1DA] overflow-hidden bg-black">
+                <video ref={videoRef} className="w-full h-72 object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
 
-                {/* Animated Scanner Reticle / Viewfinder Frame */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-6">
-                  <div className="w-56 h-56 border-2 border-sky-400/80 rounded-2xl relative">
-                    {/* Corner Reticles */}
-                    <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-sky-400 -mt-1 -ml-1 rounded-tl-sm" />
-                    <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-sky-400 -mt-1 -mr-1 rounded-tr-sm" />
-                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-sky-400 -mb-1 -ml-1 rounded-bl-sm" />
-                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-sky-400 -mb-1 -mr-1 rounded-br-sm" />
-
-                    {/* Animated scanning laser line */}
-                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-lg shadow-sky-400 animate-pulse mt-24" />
-                  </div>
-                  <span className="text-xs text-sky-300 font-semibold mt-4 bg-slate-950/80 px-3 py-1 rounded-full border border-sky-500/30">
-                    Align QR code within box
+                  <div className="w-48 h-48 border-2 border-white/80 rounded relative" />
+                  <span className="text-[11px] text-white mt-3 bg-black/60 px-3 py-1 rounded">
+                    Align gate display QR inside frame
                   </span>
                 </div>
 
-                {/* Stop button overlay */}
-                <div className="absolute bottom-3 right-3">
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <button
+                    onClick={toggleFacingMode}
+                    className="p-1.5 bg-black/70 hover:bg-black/90 text-white rounded text-xs flex items-center gap-1"
+                    title="Flip camera"
+                  >
+                    <FlipHorizontal className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={stopCamera}
-                    className="p-2.5 bg-slate-900/90 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 shadow"
+                    className="px-2.5 py-1 bg-black/70 hover:bg-black/90 text-white rounded text-xs font-medium"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="py-8 flex flex-col items-center">
-                <div className="w-20 h-20 rounded-3xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-4 shadow-lg shadow-sky-500/10">
-                  <QrCode className="w-10 h-10" />
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">Scan Gate or Mess QR Code</h2>
-                <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
-                  Point your device camera at the physical display screen at your hostel gate or mess counter.
+              <div className="py-6 flex flex-col items-center">
+                <QrCode className="w-10 h-10 text-[#26415C] mb-3" strokeWidth={1.5} />
+                <h2 className="font-serif text-lg font-medium text-[#1C2430] mb-1">
+                  Scan gate or mess QR code
+                </h2>
+                <p className="text-xs text-[#5B6472] max-w-md mx-auto mb-6 leading-relaxed">
+                  Hold your phone camera up to the physical monitor display at your assigned hostel gate or mess counter.
                 </p>
 
                 {cameraError && (
-                  <div className="mb-6 p-4 max-w-md rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-3 text-left">
-                    <VideoOff className="w-5 h-5 flex-shrink-0" />
+                  <div className="mb-4 p-3 max-w-md rounded bg-[#B3432B]/5 border border-[#B3432B]/20 text-[#B3432B] text-xs flex items-center gap-2 text-left">
+                    <VideoOff className="w-4 h-4 shrink-0" />
                     <span>{cameraError}</span>
                   </div>
                 )}
@@ -578,21 +534,21 @@ export const StudentAppPage: React.FC = () => {
                 <button
                   onClick={startCamera}
                   disabled={isScanning}
-                  className="px-6 py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm transition shadow-lg shadow-sky-600/30 flex items-center gap-2.5"
+                  className="px-6 py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs transition flex items-center justify-center gap-2"
                 >
-                  <Camera className="w-5 h-5" />
-                  <span>Launch Camera Scanner</span>
+                  <Camera className="w-4 h-4" />
+                  <span>Launch camera scanner</span>
                 </button>
               </div>
             )}
 
-            {/* Manual Token Fallback */}
-            <div className="mt-8 pt-6 border-t border-slate-800/80 text-left">
+            {/* Manual Token Input */}
+            <div className="mt-8 pt-6 border-t border-[#E4E1DA] text-left">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  Test / Manual Token Input
+                <label className="text-xs font-medium text-[#1C2430]">
+                  Manual token entry
                 </label>
-                <span className="text-[11px] text-slate-500">For testing on a single screen without a mobile camera</span>
+                <span className="text-[11px] text-[#5B6472]">For testing without a secondary camera</span>
               </div>
               <form onSubmit={handleManualSubmit} className="flex flex-col sm:flex-row gap-2">
                 <input
@@ -600,22 +556,22 @@ export const StudentAppPage: React.FC = () => {
                   placeholder="Paste 64-character token..."
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-sky-500"
+                  className="flex-1 px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] font-mono placeholder-[#5B6472]/60 focus:outline-none focus:border-[#26415C]"
                 />
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handlePasteFromClipboard}
-                    className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs transition border border-slate-700 flex items-center gap-1.5"
-                    title="Paste token from clipboard and verify"
+                    className="px-3 py-2 rounded bg-[#FAF9F6] hover:bg-[#E4E1DA]/40 text-[#1C2430] text-xs border border-[#E4E1DA] flex items-center justify-center gap-1.5 transition"
+                    title="Paste from clipboard"
                   >
-                    <ClipboardPaste className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Paste & Scan</span>
+                    <ClipboardPaste className="w-3.5 h-3.5 text-[#5B6472]" />
+                    <span>Paste</span>
                   </button>
                   <button
                     type="submit"
                     disabled={isScanning || !manualToken.trim()}
-                    className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition shadow-md shadow-sky-600/20 disabled:opacity-40"
+                    className="px-4 py-2 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs transition disabled:opacity-40"
                   >
                     {isScanning ? 'Verifying...' : 'Submit'}
                   </button>
@@ -626,29 +582,26 @@ export const StudentAppPage: React.FC = () => {
         </div>
       )}
 
-      {/* 4. TAB 2: ENTRY/EXIT HISTORY (6.8) */}
+      {/* 4. Tab 2: Gate Entry/Exit History */}
       {activeTab === 'history' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-sky-400" />
-              <span>Hostel Entry & Exit History</span>
+          <div className="flex items-center justify-between pb-2 border-b border-[#E4E1DA]">
+            <h2 className="font-serif text-base font-medium text-[#1C2430]">
+              Gate entrance records
             </h2>
-            <span className="text-xs text-slate-400 font-mono">
-              Total Recorded: {hostelLogs.length}
+            <span className="text-xs text-[#5B6472] font-mono tabular-nums">
+              {hostelLogs.length} total
             </span>
           </div>
 
           {hostelLogs.length === 0 ? (
-            <div className="py-16 text-center bg-slate-900/60 border border-slate-800 rounded-3xl p-8">
-              <ArrowRightLeft className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-white mb-1">No Scans Recorded Yet</h3>
-              <p className="text-xs text-slate-400">
-                Your entry and exit movements will appear here automatically when you scan at a gate kiosk.
+            <div className="py-12 text-center bg-white border border-[#E4E1DA] rounded-lg p-6">
+              <p className="text-xs text-[#5B6472]">
+                No gate movements recorded yet.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="bg-white border border-[#E4E1DA] rounded-lg divide-y divide-[#E4E1DA]">
               {hostelLogs.map((log) => {
                 const isEntry = log.direction === 'ENTRY';
                 const dateObj = new Date(log.scanned_at);
@@ -662,49 +615,31 @@ export const StudentAppPage: React.FC = () => {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
-                  year: 'numeric',
                 });
 
                 return (
                   <div
                     key={log.id}
-                    className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-4"
+                    className="p-3 sm:p-4 hover:bg-[#FAF9F6] transition flex items-center justify-between gap-3 text-xs"
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
-                          isEntry
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                            : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                        }`}
-                      >
-                        {isEntry ? <LogIn className="w-5 h-5" /> : <LogOut className="w-5 h-5" />}
-                      </div>
-
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: isEntry ? '#2E7D5B' : '#B7791F' }}
+                      />
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                              isEntry
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-amber-500/20 text-amber-300'
-                            }`}
-                          >
-                            {log.direction}
-                          </span>
-                          <span className="text-sm font-bold text-white">
-                            {log.gate?.name || 'Gate Terminal'}
-                          </span>
+                        <div className="font-medium text-[#1C2430]">
+                          {isEntry ? 'Inside' : 'Outside'} • {log.gate?.name || 'Gate terminal'}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          {log.hostel?.name || 'Hostel Campus'}
+                        <div className="text-[11px] text-[#5B6472] mt-0.5">
+                          {log.hostel?.name || 'Campus hostel'}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-slate-200">{timeStr}</div>
-                      <div className="text-[11px] text-slate-500">{dateStr}</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono text-[#1C2430] tabular-nums">{timeStr}</div>
+                      <div className="text-[11px] text-[#5B6472]">{dateStr}</div>
                     </div>
                   </div>
                 );
@@ -714,68 +649,59 @@ export const StudentAppPage: React.FC = () => {
         </div>
       )}
 
-      {/* 5. TAB 3: MESS ATTENDANCE HISTORY */}
+      {/* 5. Tab 3: Dining Attendance History */}
       {activeTab === 'mess' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Utensils className="w-5 h-5 text-amber-400" />
-              <span>Mess & Meal Consumption Log</span>
+          <div className="flex items-center justify-between pb-2 border-b border-[#E4E1DA]">
+            <h2 className="font-serif text-base font-medium text-[#1C2430]">
+              Dining hall records
             </h2>
-            <span className="text-xs text-slate-400 font-mono">
-              Total Meals: {messLogs.length}
+            <span className="text-xs text-[#5B6472] font-mono tabular-nums">
+              {messLogs.length} total
             </span>
           </div>
 
           {messLogs.length === 0 ? (
-            <div className="py-16 text-center bg-slate-900/60 border border-slate-800 rounded-3xl p-8">
-              <Utensils className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-white mb-1">No Meal Records Yet</h3>
-              <p className="text-xs text-slate-400">
-                When you scan your QR at the mess counter during an active meal window, your meals will be logged here.
+            <div className="py-12 text-center bg-white border border-[#E4E1DA] rounded-lg p-6">
+              <p className="text-xs text-[#5B6472]">
+                No meal scans recorded yet.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="bg-white border border-[#E4E1DA] rounded-lg divide-y divide-[#E4E1DA]">
               {messLogs.map((log) => {
                 const dateObj = new Date(log.scanned_at);
                 const timeStr = dateObj.toLocaleTimeString('en-IN', {
                   hour: '2-digit',
                   minute: '2-digit',
+                  second: '2-digit',
                   hour12: true,
                 });
                 const dateStr = dateObj.toLocaleDateString('en-IN', {
                   month: 'short',
                   day: 'numeric',
-                  year: 'numeric',
                 });
 
                 return (
                   <div
                     key={log.id}
-                    className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4"
+                    className="p-3 sm:p-4 hover:bg-[#FAF9F6] transition flex items-center justify-between gap-3 text-xs"
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
-                        <Utensils className="w-5 h-5" />
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <Utensils className="w-4 h-4 text-[#5B6472]" strokeWidth={1.5} />
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300">
-                            {log.meal_type}
-                          </span>
-                          <span className="text-sm font-bold text-white">{log.mess?.name}</span>
+                        <div className="font-medium text-[#1C2430]">
+                          {log.meal_type} • {log.mess?.name || 'Campus mess'}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          <span>Window: {log.meal_window?.start_time} - {log.meal_window?.end_time}</span>
+                        <div className="text-[11px] text-[#5B6472] mt-0.5">
+                          Window: {log.meal_window?.start_time} - {log.meal_window?.end_time}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-slate-200">{timeStr}</div>
-                      <div className="text-[11px] text-slate-500">{dateStr}</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono text-[#1C2430] tabular-nums">{timeStr}</div>
+                      <div className="text-[11px] text-[#5B6472]">{dateStr}</div>
                     </div>
                   </div>
                 );

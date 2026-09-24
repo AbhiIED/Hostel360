@@ -1,7 +1,19 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { QrCode, Shield, LayoutDashboard, UserCheck, LogOut, LogIn } from 'lucide-react';
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import {
+  QrCode,
+  Shield,
+  LayoutDashboard,
+  UserCheck,
+  Building,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+} from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { Header } from './components/Header';
+import { DashboardNav } from './components/DashboardNav';
+import { Footer } from './components/Footer';
 import { LoginPage } from './pages/LoginPage';
 import { DeviceManagementPage } from './pages/DeviceManagementPage';
 import { HostelRoomManagementPage } from './pages/HostelRoomManagementPage';
@@ -13,223 +25,202 @@ import { DashboardHubPage } from './pages/DashboardHubPage';
 import { AttendanceHistoryPage } from './pages/AttendanceHistoryPage';
 import { AnalyticsReportsPage } from './pages/AnalyticsReportsPage';
 
-const Navigation = () => {
-  const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+const HomeView = () => {
+  const { user, isAuthenticated } = useAuth();
 
-  // Kiosk screens run borderless without the website navbar
-  if (location.pathname.startsWith('/display/')) {
-    return null;
+  // Bug 1 Fix: Authenticated visitors must NEVER see the public hero/marketing view
+  if (isAuthenticated && user) {
+    if (user.role === 'STUDENT') {
+      return <Navigate to="/app" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
   }
 
+  // Bug 2 Fix: Logged-out institutional landing page with high contrast and zero dark artifacts
   return (
-    <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="bg-sky-500/10 p-2 rounded-xl border border-sky-500/20 text-sky-400">
-            <Shield className="w-6 h-6" />
-          </div>
-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-            HOSTEL360
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-1 hidden sm:inline">
-            MANIT Bhopal
-          </span>
-        </Link>
+    <div className="max-w-6xl mx-auto py-8 sm:py-12 px-4 sm:px-6">
+      {/* Official Hero Section */}
+      <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-[#26415C] border border-[#E4E1DA] text-xs font-medium mb-4">
+          <Shield className="w-3.5 h-3.5 text-[#26415C]" strokeWidth={1.75} />
+          <span>Council of Wardens (COW) department • MANIT Bhopal</span>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-medium tracking-tight text-[#1C2430] mb-3 leading-tight font-serif">
+          Central Campus Residential & Dining Access System
+        </h1>
+        <p className="text-xs sm:text-sm text-[#5B6472] leading-relaxed max-w-2xl mx-auto">
+          Official attendance and security management across all 12 MANIT hostels. Powered by physical wall kiosk monitors with rotating dynamic 20-second QR codes and instant photo verification.
+        </p>
 
-        <nav className="flex items-center gap-2">
-          {/* 1. Student navigation: ONLY Student Scanner is visible */}
-          {isAuthenticated && user?.role === 'STUDENT' && (
-            <Link
-              to="/app"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                location.pathname.startsWith('/app')
-                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/25'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <UserCheck className="w-4 h-4 text-sky-400" />
-              <span>Student Scanner</span>
-            </Link>
-          )}
-
-          {/* 2. Admin / Warden navigation */}
-          {isAuthenticated && user && ['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN'].includes(user.role) && (
-            <Link
-              to="/dashboard"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                location.pathname.startsWith('/dashboard')
-                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/25'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4 text-sky-400" />
-              <span>Control Center</span>
-            </Link>
-          )}
-
-          {/* 3. Unauthenticated public quick links */}
-          {!isAuthenticated && (
-            <div className="hidden sm:flex items-center gap-2 text-xs">
-              <Link
-                to="/app"
-                className="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition font-medium"
-              >
-                Student Scanner
-              </Link>
-              <Link
-                to="/dashboard"
-                className="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition font-medium"
-              >
-                Staff Portal
-              </Link>
-            </div>
-          )}
-
-          <div className="h-5 w-px bg-slate-800 mx-1" />
-
-          {isAuthenticated && user ? (
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <div className="text-xs font-semibold text-white leading-tight">{user.name}</div>
-                <div className="text-[10px] text-sky-400 font-mono font-semibold">{user.role}</div>
-              </div>
-              <button
-                onClick={logout}
-                title="Sign out"
-                className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <Link
-              to="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shadow-md shadow-sky-600/20"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Sign In</span>
-            </Link>
-          )}
-        </nav>
+        {/* Action buttons for visitors */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+          <Link
+            to="/login"
+            className="px-5 py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs flex items-center gap-2 transition"
+          >
+            <span>Staff and warden sign in</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+          <Link
+            to="/app"
+            className="px-5 py-2.5 rounded bg-white hover:bg-[#FAF9F6] text-[#1C2430] font-medium text-xs border border-[#E4E1DA] flex items-center gap-2 transition"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-[#26415C]" />
+            <span>Student mobile scanner</span>
+          </Link>
+        </div>
       </div>
-    </header>
+
+      {/* Three Institutional Access Portals */}
+      <div className="grid md:grid-cols-3 gap-6 mb-12">
+        {/* 1. Student Residential Portal */}
+        <div className="bg-white border border-[#E4E1DA] rounded-lg p-6 flex flex-col justify-between">
+          <div>
+            <div className="text-[#26415C] mb-4">
+              <UserCheck className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            <div className="inline-block px-2.5 py-0.5 rounded bg-[#FAF9F6] text-[#5B6472] border border-[#E4E1DA] text-[11px] font-medium mb-2">
+              Resident students
+            </div>
+            <h2 className="text-base font-serif font-medium text-[#1C2430] mb-2">
+              Student mobile scanner
+            </h2>
+            <p className="text-xs text-[#5B6472] leading-relaxed mb-6">
+              Students open their smartphone camera to scan the physical monitor at their hostel gate or mess hall. Instant gate state transition (Inside / Outside) and personal audit trail.
+            </p>
+          </div>
+          <Link
+            to="/app"
+            className="w-full py-2.5 px-4 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs text-center transition flex items-center justify-center gap-2"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Open student scanner</span>
+          </Link>
+        </div>
+
+        {/* 2. Staff & Council of Wardens Operations */}
+        <div className="bg-white border border-[#E4E1DA] rounded-lg p-6 flex flex-col justify-between">
+          <div>
+            <div className="text-[#26415C] mb-4">
+              <LayoutDashboard className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            <div className="inline-block px-2.5 py-0.5 rounded bg-[#FAF9F6] text-[#5B6472] border border-[#E4E1DA] text-[11px] font-medium mb-2">
+              Wardens and caretakers
+            </div>
+            <h2 className="text-base font-serif font-medium text-[#1C2430] mb-2">
+              Operations control center
+            </h2>
+            <p className="text-xs text-[#5B6472] leading-relaxed mb-6">
+              Real-time occupancy metrics for all 12 MANIT hostels, live entrance/exit event streams, student room allocations, Caretaker state correction workflow with audit reasons, and official CSV exports.
+            </p>
+          </div>
+          <Link
+            to="/login"
+            className="w-full py-2.5 px-4 rounded bg-white hover:bg-[#FAF9F6] text-[#1C2430] font-medium text-xs text-center transition border border-[#E4E1DA] flex items-center justify-center gap-2"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5 text-[#26415C]" />
+            <span>Sign in to operations</span>
+          </Link>
+        </div>
+
+        {/* 3. Physical Wall Display Kiosks */}
+        <div className="bg-white border border-[#E4E1DA] rounded-lg p-6 flex flex-col justify-between">
+          <div>
+            <div className="text-[#26415C] mb-4">
+              <QrCode className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            <div className="inline-block px-2.5 py-0.5 rounded bg-[#FAF9F6] text-[#5B6472] border border-[#E4E1DA] text-[11px] font-medium mb-2">
+              Wall terminal displays
+            </div>
+            <h2 className="text-base font-serif font-medium text-[#1C2430] mb-2">
+              Gate and mess displays
+            </h2>
+            <p className="text-xs text-[#5B6472] leading-relaxed mb-4">
+              Fixed tablets and monitors at campus gates and dining counters that continuously rotate fresh 20-second dynamic QR tokens with a 5-second anti-proxy photo confirmation flash.
+            </p>
+
+            <div className="space-y-2 mb-6">
+              <Link
+                to="/display/gate/H1_GATE_TEST_7214"
+                className="flex items-center justify-between p-2 rounded bg-[#FAF9F6] border border-[#E4E1DA] hover:border-[#26415C] text-xs transition"
+              >
+                <span className="font-medium text-[#1C2430]">H1 Gate display (Boys)</span>
+                <span className="text-[11px] text-[#5B6472] font-mono">Secret: kiosk123</span>
+              </Link>
+              <Link
+                to="/display/mess/MESS_DEV_8859"
+                className="flex items-center justify-between p-2 rounded bg-[#FAF9F6] border border-[#E4E1DA] hover:border-[#26415C] text-xs transition"
+              >
+                <span className="font-medium text-[#1C2430]">Central mess display</span>
+                <span className="text-[11px] text-[#5B6472] font-mono">Secret: kiosk123</span>
+              </Link>
+            </div>
+          </div>
+          <p className="text-[11px] text-[#5B6472] text-center">
+            Hardware authenticated via device secret and HMAC tokens
+          </p>
+        </div>
+      </div>
+
+      {/* Institutional Security Protocol Highlights */}
+      <div className="bg-white border border-[#E4E1DA] rounded-lg p-6 sm:p-8 mb-8">
+        <div className="text-center max-w-2xl mx-auto mb-6">
+          <div className="text-xs font-medium text-[#5B6472] mb-1">
+            Security architecture
+          </div>
+          <h2 className="text-xl sm:text-2xl font-serif font-medium text-[#1C2430] tracking-tight">
+            Why MANIT uses reverse dynamic QR attendance
+          </h2>
+          <p className="text-xs text-[#5B6472] mt-1">
+            Eliminates photo forwarding, proxy attendance, and outdated paper registers.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-6">
+          <div className="p-4 rounded bg-[#FAF9F6] border border-[#E4E1DA]">
+            <Clock className="w-5 h-5 text-[#26415C] mb-2" strokeWidth={1.5} />
+            <h3 className="text-xs font-semibold text-[#1C2430] mb-1">20-second dynamic tokens</h3>
+            <p className="text-xs text-[#5B6472] leading-relaxed">
+              QR codes change every 20 seconds. Screenshots cannot be forwarded or reused because expired tokens are rejected atomically.
+            </p>
+          </div>
+
+          <div className="p-4 rounded bg-[#FAF9F6] border border-[#E4E1DA]">
+            <CheckCircle2 className="w-5 h-5 text-[#2E7D5B] mb-2" strokeWidth={1.5} />
+            <h3 className="text-xs font-semibold text-[#1C2430] mb-1">5-second guard screen flash</h3>
+            <p className="text-xs text-[#5B6472] leading-relaxed">
+              When a student scans, the wall display flashes their verified identity card photo, name, and room number to on-duty security guards.
+            </p>
+          </div>
+
+          <div className="p-4 rounded bg-[#FAF9F6] border border-[#E4E1DA]">
+            <Building className="w-5 h-5 text-[#B7791F] mb-2" strokeWidth={1.5} />
+            <h3 className="text-xs font-semibold text-[#1C2430] mb-1">Strict hostel scoping</h3>
+            <p className="text-xs text-[#5B6472] leading-relaxed">
+              Students assigned to Hostel H1 cannot scan into Hostel H8. The backend enforces strict hostel and gender boundary isolation in real time.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
-
-const HomeView = () => (
-  <div className="max-w-6xl mx-auto py-12 px-4 sm:px-6">
-    <div className="text-center max-w-3xl mx-auto mb-12">
-      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-xs font-bold uppercase tracking-wider mb-5">
-        MANIT Bhopal • Smart QR Attendance Architecture
-      </div>
-      <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white mb-5 leading-tight">
-        Hostel & Mess Access Control
-      </h1>
-      <p className="text-base text-slate-300">
-        Physical wall displays at gates & mess counters show rotating 20-second dynamic QR codes.
-        Authenticated students scan them with their phone camera to instantly record entry, exit, or meals.
-      </p>
-    </div>
-
-    {/* THREE DISTINCT PORTALS */}
-    <div className="grid md:grid-cols-3 gap-6 mb-12">
-      {/* 1. STUDENT PORTAL */}
-      <div className="rounded-3xl bg-slate-900 border-2 border-sky-500/30 p-7 shadow-xl shadow-sky-950/40 flex flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
-        <div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center justify-center mb-5 shadow-lg">
-            <UserCheck className="w-6 h-6" />
-          </div>
-          <div className="inline-block px-2.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-bold uppercase tracking-wider mb-2">
-            Student Portal
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Camera QR Scanner</h2>
-          <p className="text-xs text-slate-400 leading-relaxed mb-6">
-            Students open their phone camera to <strong className="text-white">SCAN</strong> the physical gate or mess monitor. Students never generate QR codes.
-          </p>
-        </div>
-        <Link
-          to="/app"
-          className="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs text-center transition shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2"
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Open Student Scanner</span>
-        </Link>
-      </div>
-
-      {/* 2. ADMIN & WARDEN DASHBOARD */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-7 shadow-xl flex flex-col justify-between">
-        <div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-5 shadow-lg">
-            <LayoutDashboard className="w-6 h-6" />
-          </div>
-          <div className="inline-block px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold uppercase tracking-wider mb-2">
-            Staff & Admin
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Operations Control Center</h2>
-          <p className="text-xs text-slate-400 leading-relaxed mb-6">
-            Real-time occupancy tracking across 12 MANIT hostels, live gate feeds, meal schedules, student allocations, and CSV/PDF analytics reports.
-          </p>
-        </div>
-        <Link
-          to="/dashboard"
-          className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs text-center transition border border-slate-700 flex items-center justify-center gap-2"
-        >
-          <LayoutDashboard className="w-4 h-4 text-amber-400" />
-          <span>Open Admin Dashboard</span>
-        </Link>
-      </div>
-
-      {/* 3. PHYSICAL WALL DISPLAYS (KIOSKS) */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-7 shadow-xl flex flex-col justify-between">
-        <div>
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-5 shadow-lg">
-            <QrCode className="w-6 h-6" />
-          </div>
-          <div className="inline-block px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[11px] font-bold uppercase tracking-wider mb-2">
-            Hardware Wall Terminals
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Gate & Mess Displays</h2>
-          <p className="text-xs text-slate-400 leading-relaxed mb-4">
-            Fixed tablet screens mounted at gates and mess counters that <strong className="text-white">DISPLAY</strong> rotating 20s QR codes for students to scan.
-          </p>
-
-          <div className="space-y-2 mb-6">
-            <Link
-              to="/display/gate/H1_GATE_TEST_7214"
-              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/40 text-xs transition"
-            >
-              <span className="font-semibold text-white">H1 Gate Display (Boys)</span>
-              <span className="text-[10px] text-indigo-400 font-mono">Secret: kiosk123</span>
-            </Link>
-            <Link
-              to="/display/mess/MESS_DEV_8859"
-              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500/40 text-xs transition"
-            >
-              <span className="font-semibold text-white">Central Mess Display</span>
-              <span className="text-[10px] text-emerald-400 font-mono">Secret: kiosk123</span>
-            </Link>
-          </div>
-        </div>
-        <p className="text-[11px] text-slate-500 text-center">
-          Terminal displays flash 5s photo confirmation upon scan
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-          <Navigation />
+        <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+          <Header />
+          <DashboardNav />
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<HomeView />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/caretaker" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/warden" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/mess" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
               <Route
                 path="/app/*"
                 element={
@@ -259,7 +250,7 @@ export default function App() {
               <Route
                 path="/dashboard/hostels"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER']}>
                     <HostelRoomManagementPage />
                   </ProtectedRoute>
                 }
@@ -267,7 +258,7 @@ export default function App() {
               <Route
                 path="/dashboard/students"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER']}>
                     <StudentManagementPage />
                   </ProtectedRoute>
                 }
@@ -283,7 +274,7 @@ export default function App() {
               <Route
                 path="/dashboard/history"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN']}>
                     <AttendanceHistoryPage />
                   </ProtectedRoute>
                 }
@@ -291,7 +282,7 @@ export default function App() {
               <Route
                 path="/dashboard/analytics"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN']}>
                     <AnalyticsReportsPage />
                   </ProtectedRoute>
                 }
@@ -299,7 +290,7 @@ export default function App() {
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN']}>
                     <DashboardHubPage />
                   </ProtectedRoute>
                 }
@@ -307,13 +298,14 @@ export default function App() {
               <Route
                 path="/dashboard/*"
                 element={
-                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN']}>
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN']}>
                     <DashboardHubPage />
                   </ProtectedRoute>
                 }
               />
             </Routes>
           </main>
+          <Footer />
         </div>
       </BrowserRouter>
     </AuthProvider>

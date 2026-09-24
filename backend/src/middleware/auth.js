@@ -28,6 +28,12 @@ export async function authenticate(req, res, next) {
             room: true,
           },
         },
+        staff_hostel_assignments: {
+          include: { hostel: true },
+        },
+        staff_mess_assignments: {
+          include: { mess: true },
+        },
       },
     });
 

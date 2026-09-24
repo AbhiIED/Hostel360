@@ -5,8 +5,21 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'STUDENT' | 'WARDEN' | 'MESS_ADMIN' | 'SUPER_ADMIN';
+  role: 'STUDENT' | 'WARDEN' | 'VICE_WARDEN' | 'CARETAKER' | 'MESS_ADMIN' | 'SUPER_ADMIN';
   is_active: boolean;
+  staff_hostel_assignments?: Array<{
+    id: string;
+    hostel_id: string;
+    role: string;
+    is_primary: boolean;
+    hostel?: { id: string; name: string; code: string };
+  }>;
+  staff_mess_assignments?: Array<{
+    id: string;
+    mess_id: string;
+    role: string;
+    mess?: { id: string; name: string };
+  }>;
   student?: {
     id: string;
     roll_number: string;

@@ -131,14 +131,16 @@ graph TB
 
 ## 4. User Personas & Role Matrix
 
-HOSTEL360 implements strict **Role-Based Access Control (RBAC)** across five distinct identities:
+HOSTEL360 implements strict **Role-Based Access Control (RBAC)** across real-world collegiate roles reflecting MANIT's organizational hierarchy:
 
 | Role | Target Persona | Primary Auth Mechanism | Accessible Routes | Permitted Operations |
 | :--- | :--- | :--- | :--- | :--- |
-| **`STUDENT`** | Enrolled undergraduate/postgraduate student residing in a campus hostel | JWT Bearer Access Token (15 min) | `/app`, `/app/history`, `/app/mess` | • Camera QR scanning<br>• View own INSIDE/OUTSIDE status<br>• View own hostel entry/exit log<br>• View own mess attendance |
-| **`WARDEN`** | Faculty in charge of a specific hostel (e.g. H5 Warden) or gender group (Chief Warden - Boys) | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/hostels`, `/dashboard/students`, `/dashboard/history`, `/dashboard/analytics` | • View hostel-scoped occupancy feeds<br>• View student room allocations<br>• Search student directory<br>• View historical gate traffic<br>• Export hostel attendance reports |
-| **`MESS_ADMIN`** | Campus mess contractor or dining hall supervisor | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/messes`, `/dashboard/history`, `/dashboard/analytics` | • Configure meal windows (Breakfast, Lunch, Snacks, Dinner)<br>• View live meal serving counts<br>• Monitor meal window compliance<br>• Export mess consumption reports |
-| **`SUPER_ADMIN`** | MANIT Chief Administrator or Dean of Student Welfare (DSW) | JWT Bearer Access Token (15 min) | `/dashboard/*` (All routes) | • Complete system CRUD permissions<br>• Register hardware kiosk devices & issue secrets<br>• Manage all 12 hostels and rooms<br>• Allocate/reassign student rooms<br>• Deactivate compromised devices instantly<br>• View audit logs & campus-wide analytics |
+| **`SUPER_ADMIN`** | Chairman of the Council of Wardens (COW) office & Dean of Student Welfare (DSW) | JWT Bearer Access Token (15 min) | `/dashboard/*` (Campus-wide) | • Campus-wide oversight of all 12 hostels<br>• Register hardware kiosk devices & issue secrets<br>• Create & delete hostels, rooms, and students<br>• Manage staff assignments (Wardens, Vice Wardens, Caretakers)<br>• Deactivate compromised devices instantly<br>• View campus-wide audit logs & analytics |
+| **`WARDEN`** | Faculty member in charge of a specific hostel (e.g. H5 Warden) | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/hostels`, `/dashboard/students`, `/dashboard/history`, `/dashboard/analytics` | • Hostel-scoped live occupancy & gate feeds<br>• View student room allocations in assigned hostel<br>• Update student room assignments<br>• View historical gate traffic for assigned hostel<br>• Export hostel attendance CSV reports |
+| **`VICE_WARDEN`** | Assistant faculty supporting the Warden with delegated authority | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/hostels`, `/dashboard/students`, `/dashboard/history`, `/dashboard/analytics` | • Hostel-scoped live occupancy monitoring<br>• View student directory & room allocations<br>• View attendance logs & export analytics for assigned hostel |
+| **`CARETAKER`** | Non-faculty operational staff on duty at each hostel | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/hostels`, `/dashboard/students`, `/dashboard/history`, `/dashboard/analytics` | • Operational student state corrections (`INSIDE` $\leftrightarrow$ `OUTSIDE`) with mandatory audit reason<br>• Room occupancy checks & room reallocations<br>• Live gate attendance feed monitoring<br>• Search student directory |
+| **`MESS_ADMIN`** | Campus mess contractor or dining hall supervisor | JWT Bearer Access Token (15 min) | `/dashboard`, `/dashboard/messes`, `/dashboard/history`, `/dashboard/analytics` | • Configure meal windows (Breakfast, Lunch, Snacks, Dinner)<br>• View live meal serving counts<br>• Monitor meal window compliance & anti-double-dipping<br>• Export mess consumption reports |
+| **`STUDENT`** | Enrolled undergraduate/postgraduate student residing in a campus hostel | JWT Bearer Access Token (15 min) | `/app`, `/app/history`, `/app/mess` | • Camera QR scanning at gate and mess kiosks<br>• View own INSIDE/OUTSIDE status<br>• View personal hostel entry/exit log<br>• View personal mess attendance history |
 | **`DEVICE`** | Fixed wall-mounted tablet or Raspberry Pi at hostel gate or mess counter | Device Secret (`kiosk123`) passed in `Authorization: Bearer` and `x-device-id` header | `/display/gate/:deviceId`, `/display/mess/:deviceId` | • Fetch 20s dynamic QR code<br>• Join device-scoped Socket.IO room<br>• Receive 5s photo confirmation flash<br>• Report device heartbeat |
 
 ---
@@ -521,15 +523,17 @@ erDiagram
     User ||--o| Student : "has profile"
     User ||--o{ RefreshToken : "owns sessions"
     User ||--o{ AuditLog : "initiates actions"
-    User ||--o{ Hostel : "warden of"
-    User ||--o{ Mess : "administers"
+    User ||--o{ StaffHostelAssignment : "hostel duties"
+    User ||--o{ StaffMessAssignment : "mess duties"
     User ||--o{ Device : "registered by"
 
+    Hostel ||--o{ StaffHostelAssignment : "assigned staff"
     Hostel ||--o{ Room : "contains"
     Hostel ||--o{ Gate : "has entrances"
     Hostel ||--o{ Student : "residents"
     Room ||--o{ Student : "occupants"
 
+    Mess ||--o{ StaffMessAssignment : "assigned managers"
     Gate ||--o{ Device : "mounted display"
     Mess ||--o{ Device : "counter display"
     Mess ||--o{ MealWindow : "schedules"
@@ -545,19 +549,21 @@ erDiagram
 
 ### Key Relational Entities
 
-1. **`User`**: Base authentication table storing email, bcrypt password hash, role (`STUDENT`, `WARDEN`, `MESS_ADMIN`, `SUPER_ADMIN`), and active status.
+1. **`User`**: Base authentication table storing email, bcrypt password hash, role (`STUDENT`, `WARDEN`, `VICE_WARDEN`, `CARETAKER`, `MESS_ADMIN`, `SUPER_ADMIN`), and active status.
 2. **`Student`**: Linked 1:1 to User; contains roll number, gender, department, year, photo URL, current location state (`INSIDE` / `OUTSIDE`), assigned hostel ID, and assigned room ID.
-3. **`Hostel`**: Code (`H1`–`H12`), full name, campus location, gender type (`BOYS` / `GIRLS`), capacity, and warden ID.
-4. **`Room`**: Unique room number (`[HH][F][RR]`), floor, block (for H10), capacity, and current occupant count.
-5. **`Gate`**: Physical entrance linked to a hostel (e.g., `Main Gate`, `Side Gate`).
-6. **`Mess`**: Dining facility with name and designated mess manager.
-7. **`MealWindow`**: Active schedule for Breakfast, Lunch, Snacks, Dinner with start and end times.
-8. **`Device`**: Hardware kiosks with human-readable `device_code`, device purpose (`GATE` or `MESS`), bcrypt secret hash, active boolean, and last heartbeat timestamp.
-9. **`QrToken`**: Opaque token hash (SHA-256), device ID, purpose, 20s expiration timestamp, and status enum (`UNUSED`, `USED`, `EXPIRED`, `REVOKED`).
-10. **`HostelAttendance`**: Immutable audit record of student ID, gate ID, direction (`ENTRY` / `EXIT`), timestamp, and QR token ID.
-11. **`MessAttendance`**: Immutable record of student ID, mess ID, meal window ID, meal type, and timestamp.
-12. **`RefreshToken`**: SHA-256 hashed 32-byte tokens with user binding and expiration timestamp for session maintenance.
-13. **`AuditLog`**: Security compliance log storing actor ID, action name, target type, target ID, and JSON metadata.
+3. **`StaffHostelAssignment`**: Many-to-many junction mapping staff members (`WARDEN`, `VICE_WARDEN`, `CARETAKER`) to specific hostels with primary warden flags and assignment timestamps.
+4. **`StaffMessAssignment`**: Junction linking mess contractors and dining supervisors (`MESS_ADMIN`) to specific dining halls.
+5. **`Hostel`**: Code (`H1`–`H12`), full name, campus location, gender type (`BOYS` / `GIRLS`), and total capacity.
+6. **`Room`**: Room number (`[HH][F][RR]`), floor, block (for H10 A/B/C/D), capacity, and status (`ACTIVE`, `MAINTENANCE`, `CLOSED`). Uniqueness enforced per hostel via composite constraint `@@unique([hostel_id, room_number])`.
+7. **`Gate`**: Physical entrance linked to a hostel (e.g., `Main Gate`, `Side Gate`).
+8. **`Mess`**: Dining facility with name and linked hostel.
+9. **`MealWindow`**: Active schedule for Breakfast, Lunch, Snacks, Dinner with start and end times.
+10. **`Device`**: Hardware kiosks with human-readable `device_code`, device purpose (`GATE` or `MESS`), bcrypt secret hash, active boolean, and last heartbeat timestamp.
+11. **`QrToken`**: Opaque token hash (SHA-256), device ID, purpose, 20s expiration timestamp, and status enum (`UNUSED`, `USED`, `EXPIRED`, `REVOKED`).
+12. **`HostelAttendance`**: Immutable audit record of student ID, gate ID, direction (`ENTRY` / `EXIT`), timestamp, and QR token ID.
+13. **`MessAttendance`**: Immutable record of student ID, mess ID, meal window ID, meal type, and timestamp.
+14. **`RefreshToken`**: SHA-256 hashed 32-byte tokens with user binding and expiration timestamp for session maintenance.
+15. **`AuditLog`**: Security compliance log storing actor ID, action name, target type, target ID, mandatory free-text `reason` for state corrections and overrides, and JSON metadata.
 
 ---
 
@@ -648,3 +654,61 @@ npm test
 docker-compose up --build -d
 ```
 Starts MySQL database, Node.js backend container on port 5000, and Nginx reverse proxy serving the production Vite build on port 80.
+
+---
+
+## 11. Visual Design System & Design Tokens
+
+> **Locked Visual Standard for HOSTEL360.**  
+> Built for the institutional environment of **MANIT Bhopal (Council of Wardens / Dean of Student Welfare)**.  
+> Eliminates generic "hacker dashboard" aesthetics (no near-black canvases, no neon green/cyan, no glow/heavy drop-shadow effects, no ALL-CAPS badges, and no multiple stacked headers).
+
+### 11.1 Color Tokens & Palette
+
+| Token | Hex Value | Purpose & Strict Usage Constraints |
+| :--- | :--- | :--- |
+| `--bg` | `#FAF9F6` | **Soft warm paper canvas.** Used globally across all screen backgrounds. Stark white and dark canvases are strictly prohibited. |
+| `--surface` | `#FFFFFF` | **Card & panel surface.** Separated from `--bg` exclusively with a `1px` hairline border; never a soft drop shadow or glowing halo. |
+| `--line` | `#E4E1DA` | **Hairline borders and dividers.** Subtle delineation for modular cards, table rows, and input borders. |
+| `--ink` | `#1C2430` | **Primary text & headings.** Warm near-black offering calm, high-contrast readability without harsh pure black `#000`. |
+| `--ink-muted` | `#5B6472` | **Secondary text.** Captions, helper copy, table headers, and metadata. |
+| `--primary` | `#26415C` | **Deep institutional navy.** Reserved for primary action buttons, active navigation tab bars, and essential links. |
+| `--status-in` | `#2E7D5B` | **Muted institutional green.** Restricted strictly to data-bound "Inside / Active" indicators (small dots, numerals, thin progress bar). Never used decoratively. |
+| `--status-out` | `#B7791F` | **Muted institutional amber.** Restricted strictly to data-bound "Outside / Pending" indicators. |
+| `--status-alert` | `#B3432B` | **Muted brick red.** Restricted strictly to errors, terminal offline alerts, and scan rejections. |
+
+### 11.2 Subtle Role Accent Identifiers (3px Rule & Status Dots)
+
+Each console maintains an identical neutral canvas and surface hierarchy, differentiated only by a subtle 3px role accent bar below the global header and a small dot next to the console title:
+
+* **Super Admin (COW / DSW Office)**: `#26415C` (Deep Navy)
+* **Hostel Warden**: `#2E7D5B` (Muted Forest)
+* **Vice Warden**: `#28666E` (Deep Teal)
+* **Hostel Caretaker**: `#9C5B28` (Ochre Earth)
+* **Mess Admin / Dining Supervisor**: `#6E4369` (Muted Plum)
+* **Student Resident**: `#3B5278` (Steel Blue)
+
+### 11.3 Typography Hierarchy
+
+1. **Headings & Titles (`Source Serif 4`)**:
+   - Institutional serif with academic gravitas.
+   - Set in regular or medium weight (`font-medium`), never bold-and-huge or display-heavy.
+   - Applied to page titles (`Hostel operations`, `Hostel administration`, `Council of Wardens office`, `Dining operations`) and primary module headers.
+2. **Body, Navigation & Data (`Public Sans`)**:
+   - Government and digital-service standard typeface.
+   - Used for all navigation items, form labels, body text, table content, and tooltips.
+3. **Tabular Numerals (`tabular-nums`)**:
+   - `font-variant-numeric: tabular-nums` applied to all numerical figures (occupancy counts, capacity metrics, roll numbers, percentages, timestamps) to guarantee clean vertical column alignment.
+4. **Sentence Casing Policy**:
+   - **Zero ALL CAPS labels.** Normal sentence case is mandatory across all cards, tags, buttons, table headers, and badges.
+
+### 11.4 Layout & Information Architecture
+
+* **Unified Header**: Exactly ONE 56px header row: Institute crest + "HOSTEL360 MANIT Bhopal" on the left, console label + role dot in the center, and user name + role + sign out on the right. Helpdesk phones are moved to the footer.
+* **Quiet Footer**: Single quiet row with institute address, security desk (`0755-4051000`), anti-ragging helpline (`1800-180-5522`), and copyright.
+* **Console Structure**:
+  - **Data-Dense Consoles (Super Admin, Warden)**: Structured with a left-hand navigation rail (240px) to prevent section switching from competing with data tables.
+  - **Lean Consoles (Caretaker, Mess Admin)**: Structured with a clean, right-aligned top tab row with a 2px active underline.
+  - **Student Console**: Mobile-first responsive card layout with direct camera viewfinder and gate/mess log histories.
+* **Authenticated Routing Guard**: The public marketing hero (`/`) is for logged-out visitors only. Authenticated sessions navigating to `/` or logging in are redirected immediately to their respective console root (`/app` or `/dashboard`), preventing intermediate landing page views.
+

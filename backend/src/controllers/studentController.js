@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
 import { z } from 'zod';
+import { getUserHostelIds, userHasHostelAccess } from '../utils/roleScoping.js';
 
 // Zod schemas
 const createStudentSchema = z.object({
@@ -27,6 +28,7 @@ const updateStudentSchema = z.object({
   room_id: z.string().uuid().optional(),
   photo_url: z.string().url().max(512).optional().nullable(),
   current_state: z.enum(['INSIDE', 'OUTSIDE']).optional(),
+  reason: z.string().max(500).optional(),
 });
 
 // 4.6 List students
@@ -40,13 +42,14 @@ export async function listStudents(req, res) {
     // Build where clause
     const where = {};
 
-    // Wardens see only their hostel's students
-    if (req.user.role === 'WARDEN') {
-      const wardenHostels = await prisma.hostel.findMany({
-        where: { warden_id: req.user.id },
-        select: { id: true },
-      });
-      where.hostel_id = { in: wardenHostels.map(h => h.id) };
+    // Scope by staff hostel assignments for non-super-admins
+    const hostelIds = getUserHostelIds(req.user);
+    if (hostelIds !== null) {
+      if (hostel_id && hostelIds.includes(hostel_id)) {
+        where.hostel_id = hostel_id;
+      } else {
+        where.hostel_id = { in: hostelIds };
+      }
     } else if (hostel_id) {
       where.hostel_id = hostel_id;
     }
@@ -220,14 +223,9 @@ export async function getStudent(req, res) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    // Wardens can only view students in their hostel
-    if (req.user.role === 'WARDEN') {
-      const isWarden = await prisma.hostel.findFirst({
-        where: { id: student.hostel_id, warden_id: req.user.id },
-      });
-      if (!isWarden) {
-        return res.status(403).json({ error: 'Access denied: student is not in your hostel' });
-      }
+    // Staff can only view students in their assigned hostels
+    if (!userHasHostelAccess(req.user, student.hostel_id)) {
+      return res.status(403).json({ error: 'Access denied: student is not in your assigned hostel' });
     }
 
     return res.json({ student });
@@ -254,7 +252,11 @@ export async function updateStudent(req, res) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    const { name, email, hostel_id, room_id, ...studentData } = parsed.data;
+    if (!userHasHostelAccess(req.user, existing.hostel_id)) {
+      return res.status(403).json({ error: 'Access denied: student is not in your assigned hostel' });
+    }
+
+    const { name, email, hostel_id, room_id, reason, ...studentData } = parsed.data;
 
     // Validate hostel if changing
     if (hostel_id) {
@@ -319,9 +321,10 @@ export async function updateStudent(req, res) {
         data: {
           actor_id: req.user.id,
           actor_type: 'USER',
-          action: 'STUDENT_UPDATED',
+          action: studentData.current_state ? 'STUDENT_STATE_CORRECTION' : 'STUDENT_UPDATED',
           target_type: 'Student',
           target_id: updatedStudent.id,
+          reason: reason || null,
           meta: { roll_number: updatedStudent.roll_number, updates: parsed.data },
         },
       });

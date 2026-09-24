@@ -1,5 +1,6 @@
 import prisma from '../prisma.js';
 import { z } from 'zod';
+import { userHasHostelAccess } from '../utils/roleScoping.js';
 
 // Zod schemas
 const createRoomSchema = z.object({
@@ -21,9 +22,9 @@ export async function listRooms(req, res) {
       return res.status(404).json({ error: 'Hostel not found' });
     }
 
-    // Wardens can only access their own hostels
-    if (req.user.role === 'WARDEN' && hostel.warden_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied: you are not the warden of this hostel' });
+    // Staff can only access their assigned hostels
+    if (!userHasHostelAccess(req.user, hostel_id)) {
+      return res.status(403).json({ error: 'Access denied: you are not assigned to this hostel' });
     }
 
     // Build filter from query params

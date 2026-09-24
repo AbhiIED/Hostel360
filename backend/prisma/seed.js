@@ -10,12 +10,12 @@ async function main() {
   const salt = await bcrypt.genSalt(10);
   const commonPasswordHash = await bcrypt.hash('password123', salt);
 
-  // 1. Super Admin User
+  // 1. Super Admin User (COW / DSW Office)
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@hostel360.com' },
     update: {},
     create: {
-      name: 'MANIT Chief Administrator',
+      name: 'MANIT Dean of Student Welfare (DSW)',
       email: 'admin@hostel360.com',
       password_hash: commonPasswordHash,
       role: 'SUPER_ADMIN',
@@ -23,7 +23,7 @@ async function main() {
     },
   });
 
-  // 2. Warden Users
+  // 2. Warden Users (Faculty in charge of hostels)
   const wardenBoys = await prisma.user.upsert({
     where: { email: 'warden.boys@hostel360.com' },
     update: {},
@@ -60,7 +60,57 @@ async function main() {
     },
   });
 
-  // 3. Mess Admin User
+  // 3. Vice Warden Users (assists the Warden, reduced authority)
+  const viceWardenH1 = await prisma.user.upsert({
+    where: { email: 'vicewarden.h1@hostel360.com' },
+    update: {},
+    create: {
+      name: 'Dr. A. K. Mishra (Vice Warden - H1)',
+      email: 'vicewarden.h1@hostel360.com',
+      password_hash: commonPasswordHash,
+      role: 'VICE_WARDEN',
+      is_active: true,
+    },
+  });
+
+  const viceWardenH5 = await prisma.user.upsert({
+    where: { email: 'vicewarden.h5@hostel360.com' },
+    update: {},
+    create: {
+      name: 'Dr. P. S. Chauhan (Vice Warden - H5)',
+      email: 'vicewarden.h5@hostel360.com',
+      password_hash: commonPasswordHash,
+      role: 'VICE_WARDEN',
+      is_active: true,
+    },
+  });
+
+  // 4. Caretaker Users (non-faculty operational staff)
+  const caretakerH1 = await prisma.user.upsert({
+    where: { email: 'caretaker.h1@hostel360.com' },
+    update: {},
+    create: {
+      name: 'Shri Ram Prasad (Caretaker - H1)',
+      email: 'caretaker.h1@hostel360.com',
+      password_hash: commonPasswordHash,
+      role: 'CARETAKER',
+      is_active: true,
+    },
+  });
+
+  const caretakerH5 = await prisma.user.upsert({
+    where: { email: 'caretaker.h5@hostel360.com' },
+    update: {},
+    create: {
+      name: 'Shri Mohan Lal (Caretaker - H5)',
+      email: 'caretaker.h5@hostel360.com',
+      password_hash: commonPasswordHash,
+      role: 'CARETAKER',
+      is_active: true,
+    },
+  });
+
+  // 5. Mess Admin User
   const messAdminUser = await prisma.user.upsert({
     where: { email: 'messadmin@hostel360.com' },
     update: {},
@@ -73,20 +123,20 @@ async function main() {
     },
   });
 
-  // 4. MANIT Hostels Master Data (H1 to H12 from DATABASE_REQUIREMENTS_MANIT.md)
+  // 6. MANIT Hostels Master Data (H1 to H12 from DATABASE_REQUIREMENTS_MANIT.md)
   const manitHostelData = [
-    { num: 1, code: 'H1', name: 'Homi Jehangir Bhabha Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 192, wardenId: wardenBoys.id },
-    { num: 2, code: 'H2', name: 'Vikram Sarabhai Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 176, wardenId: wardenBoys.id },
-    { num: 3, code: 'H3', name: 'Hostel No. 3', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120, wardenId: wardenBoys.id },
-    { num: 4, code: 'H4', name: 'Hostel No. 4', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120, wardenId: wardenBoys.id },
-    { num: 5, code: 'H5', name: 'Mokshagundam Visvesvarayya Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80, wardenId: wardenH5.id },
-    { num: 6, code: 'H6', name: 'Jagadish Chandra Bose Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80, wardenId: wardenBoys.id },
-    { num: 7, code: 'H7', name: 'Kalpana Chawla Bhawan', type: 'GIRLS', has_blocks: false, location: 'MANIT Girls Hostel Complex', capacity: 144, wardenId: wardenGirls.id },
-    { num: 8, code: 'H8', name: 'Ramanujan Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 260, wardenId: wardenBoys.id },
-    { num: 9, code: 'H9', name: 'Raja Ramanna Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 176, wardenId: wardenBoys.id },
-    { num: 10, code: 'H10', name: 'Dr. APJ Abdul Kalam Bhawan', type: 'BOYS', has_blocks: true, location: 'MANIT Campus, Bhopal (Fresher Hostel)', capacity: 1024, wardenId: wardenBoys.id },
-    { num: 11, code: 'H11', name: 'Appu Bhavan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal (PhD / Scholars)', capacity: 48, wardenId: wardenBoys.id },
-    { num: 12, code: 'H12', name: 'Bhagini Nivedita Bhawan', type: 'GIRLS', has_blocks: false, location: 'MANIT Girls Hostel Complex', capacity: 200, wardenId: wardenGirls.id },
+    { num: 1, code: 'H1', name: 'Homi Jehangir Bhabha Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 192 },
+    { num: 2, code: 'H2', name: 'Vikram Sarabhai Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 176 },
+    { num: 3, code: 'H3', name: 'Hostel No. 3', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120 },
+    { num: 4, code: 'H4', name: 'Hostel No. 4', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120 },
+    { num: 5, code: 'H5', name: 'Mokshagundam Visvesvarayya Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80 },
+    { num: 6, code: 'H6', name: 'Jagadish Chandra Bose Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80 },
+    { num: 7, code: 'H7', name: 'Kalpana Chawla Bhawan', type: 'GIRLS', has_blocks: false, location: 'MANIT Girls Hostel Complex', capacity: 144 },
+    { num: 8, code: 'H8', name: 'Ramanujan Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 260 },
+    { num: 9, code: 'H9', name: 'Raja Ramanna Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 176 },
+    { num: 10, code: 'H10', name: 'Dr. APJ Abdul Kalam Bhawan', type: 'BOYS', has_blocks: true, location: 'MANIT Campus, Bhopal (Fresher Hostel)', capacity: 1024 },
+    { num: 11, code: 'H11', name: 'Appu Bhavan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal (PhD / Scholars)', capacity: 48 },
+    { num: 12, code: 'H12', name: 'Bhagini Nivedita Bhawan', type: 'GIRLS', has_blocks: false, location: 'MANIT Girls Hostel Complex', capacity: 200 },
   ];
 
   const hostelMap = {};
@@ -101,7 +151,6 @@ async function main() {
         has_blocks: h.has_blocks,
         location: h.location,
         total_capacity: h.capacity,
-        warden_id: h.wardenId,
       },
       create: {
         code: h.code,
@@ -110,7 +159,6 @@ async function main() {
         has_blocks: h.has_blocks,
         location: h.location,
         total_capacity: h.capacity,
-        warden_id: h.wardenId,
       },
     });
 
@@ -128,7 +176,13 @@ async function main() {
             const rr = String(r).padStart(2, '0');
             const roomNumber = `${hh}${block}${f}${rr}`;
             const room = await prisma.room.upsert({
-              where: { room_number: roomNumber },
+              where: {
+                hostel_id_block_room_number: {
+                  hostel_id: hostel.id,
+                  block: block,
+                  room_number: roomNumber,
+                },
+              },
               update: {},
               create: {
                 hostel_id: hostel.id,
@@ -151,10 +205,17 @@ async function main() {
           const roomNumber = `${hh}${f}${rr}`;
           const capacity = [5, 6, 11].includes(h.num) ? 1 : 2;
           const room = await prisma.room.upsert({
-            where: { room_number: roomNumber },
+            where: {
+              hostel_id_block_room_number: {
+                hostel_id: hostel.id,
+                block: '',  // null block stored as empty for non-block hostels
+                room_number: roomNumber,
+              },
+            },
             update: {},
             create: {
               hostel_id: hostel.id,
+              block: null,
               floor: f,
               room_number: roomNumber,
               capacity,
@@ -188,16 +249,161 @@ async function main() {
 
   console.log('✅ Seeded 12 MANIT Hostels (H1-H12) with 5-digit room codes [HH][F][RR] and gates.');
 
-  // 5. Mess Setup
+  // 7. Staff Hostel Assignments (replaces old warden_id FK)
+  // wardenBoys → boys hostels (H1-H6, H8-H11), primary warden
+  const boysHostelNums = [1, 2, 3, 4, 5, 6, 8, 9, 10, 11];
+  for (const num of boysHostelNums) {
+    if (num === 5) continue; // H5 has its own warden
+    await prisma.staffHostelAssignment.upsert({
+      where: {
+        user_id_hostel_id: {
+          user_id: wardenBoys.id,
+          hostel_id: hostelMap[num].id,
+        },
+      },
+      update: {},
+      create: {
+        user_id: wardenBoys.id,
+        hostel_id: hostelMap[num].id,
+        role: 'WARDEN',
+        is_primary: true,
+      },
+    });
+  }
+
+  // wardenGirls → girls hostels (H7, H12), primary warden
+  for (const num of [7, 12]) {
+    await prisma.staffHostelAssignment.upsert({
+      where: {
+        user_id_hostel_id: {
+          user_id: wardenGirls.id,
+          hostel_id: hostelMap[num].id,
+        },
+      },
+      update: {},
+      create: {
+        user_id: wardenGirls.id,
+        hostel_id: hostelMap[num].id,
+        role: 'WARDEN',
+        is_primary: true,
+      },
+    });
+  }
+
+  // wardenH5 → H5, primary warden
+  await prisma.staffHostelAssignment.upsert({
+    where: {
+      user_id_hostel_id: {
+        user_id: wardenH5.id,
+        hostel_id: hostelMap[5].id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: wardenH5.id,
+      hostel_id: hostelMap[5].id,
+      role: 'WARDEN',
+      is_primary: true,
+    },
+  });
+
+  // viceWardenH1 → H1, vice warden
+  await prisma.staffHostelAssignment.upsert({
+    where: {
+      user_id_hostel_id: {
+        user_id: viceWardenH1.id,
+        hostel_id: hostelMap[1].id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: viceWardenH1.id,
+      hostel_id: hostelMap[1].id,
+      role: 'VICE_WARDEN',
+      is_primary: false,
+    },
+  });
+
+  // viceWardenH5 → H5, vice warden
+  await prisma.staffHostelAssignment.upsert({
+    where: {
+      user_id_hostel_id: {
+        user_id: viceWardenH5.id,
+        hostel_id: hostelMap[5].id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: viceWardenH5.id,
+      hostel_id: hostelMap[5].id,
+      role: 'VICE_WARDEN',
+      is_primary: false,
+    },
+  });
+
+  // caretakerH1 → H1
+  await prisma.staffHostelAssignment.upsert({
+    where: {
+      user_id_hostel_id: {
+        user_id: caretakerH1.id,
+        hostel_id: hostelMap[1].id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: caretakerH1.id,
+      hostel_id: hostelMap[1].id,
+      role: 'CARETAKER',
+      is_primary: false,
+    },
+  });
+
+  // caretakerH5 → H5
+  await prisma.staffHostelAssignment.upsert({
+    where: {
+      user_id_hostel_id: {
+        user_id: caretakerH5.id,
+        hostel_id: hostelMap[5].id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: caretakerH5.id,
+      hostel_id: hostelMap[5].id,
+      role: 'CARETAKER',
+      is_primary: false,
+    },
+  });
+
+  console.log('✅ Seeded Staff Hostel Assignments (wardens, vice wardens, caretakers).');
+
+  // 8. Mess Setup
   const centralMess = await prisma.mess.upsert({
     where: { name: 'MANIT Central Campus Mess' },
     update: {},
     create: {
       name: 'MANIT Central Campus Mess',
       hostel_id: null,
-      mess_admin_id: messAdminUser.id,
     },
   });
+
+  // 9. Staff Mess Assignment (replaces old mess_admin_id FK)
+  await prisma.staffMessAssignment.upsert({
+    where: {
+      user_id_mess_id: {
+        user_id: messAdminUser.id,
+        mess_id: centralMess.id,
+      },
+    },
+    update: {},
+    create: {
+      user_id: messAdminUser.id,
+      mess_id: centralMess.id,
+      role: 'MESS_ADMIN',
+    },
+  });
+
+  console.log('✅ Seeded Mess with Staff Mess Assignment.');
 
   const mealWindowsData = [
     { meal_type: 'BREAKFAST', start_time: '07:30', end_time: '09:30' },
@@ -223,7 +429,7 @@ async function main() {
     }
   }
 
-  // 6. Seed Students (Enforcing gender-to-hostel binding)
+  // 10. Seed Students (Enforcing gender-to-hostel binding)
   const studentProfiles = [
     {
       name: 'Aarav Sharma',
@@ -324,6 +530,18 @@ async function main() {
 
   console.log('✅ Seeded 5 MANIT students with gender-appropriate hostel assignments.');
   console.log('🚀 MANIT Campus Seed completed successfully!');
+  console.log('');
+  console.log('📋 Login Credentials:');
+  console.log('  Super Admin (DSW): admin@hostel360.com / password123');
+  console.log('  Warden (Boys):     warden.boys@hostel360.com / password123');
+  console.log('  Warden (Girls):    warden.girls@hostel360.com / password123');
+  console.log('  Warden (H5):       warden.h5@hostel360.com / password123');
+  console.log('  Vice Warden (H1):  vicewarden.h1@hostel360.com / password123');
+  console.log('  Vice Warden (H5):  vicewarden.h5@hostel360.com / password123');
+  console.log('  Caretaker (H1):    caretaker.h1@hostel360.com / password123');
+  console.log('  Caretaker (H5):    caretaker.h5@hostel360.com / password123');
+  console.log('  Mess Admin:        messadmin@hostel360.com / password123');
+  console.log('  Student (Aarav):   aarav.sharma@student.hostel360.com / password123');
 }
 
 main()

@@ -91,7 +91,7 @@ export const AnalyticsReportsPage: React.FC = () => {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        if (['SUPER_ADMIN', 'WARDEN'].includes(user?.role || '')) {
+        if (['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER'].includes(user?.role || '')) {
           const res = await api.get('/hostels');
           const list = res.data.hostels || [];
           setHostelList(list);
@@ -198,19 +198,18 @@ export const AnalyticsReportsPage: React.FC = () => {
     : 10;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E4E1DA]">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-sky-500/20 to-indigo-500/20 border border-sky-500/30 text-sky-400">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Analytics & Intelligence Hub
-            </h1>
+          <div className="flex items-center gap-2 text-[#5B6472] text-xs font-medium mb-1">
+            <TrendingUp className="w-3.5 h-3.5 text-[#26415C]" />
+            <span>Operational intelligence</span>
           </div>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl sm:text-3xl font-serif font-medium text-[#1C2430] tracking-tight">
+            Analytics & intelligence hub
+          </h1>
+          <p className="text-xs text-[#5B6472] mt-1">
             Real-time occupancy flows, peak traffic hours, mess consumption curves, and operational audit reports.
           </p>
         </div>
@@ -218,18 +217,18 @@ export const AnalyticsReportsPage: React.FC = () => {
         {/* Action Bar: Range Picker & Instant Export */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Range Selector */}
-          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+          <div className="flex items-center bg-white border border-[#E4E1DA] rounded p-0.5 text-xs">
             {[7, 14, 30].map((days) => (
               <button
                 key={days}
                 onClick={() => setRangeDays(days)}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                className={`px-3 py-1 rounded text-xs transition ${
                   rangeDays === days
-                    ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-[#FAF9F6] text-[#1C2430] font-medium border border-[#E4E1DA]'
+                    : 'text-[#5B6472] hover:text-[#1C2430]'
                 }`}
               >
-                {days} Days
+                {days} days
               </button>
             ))}
           </div>
@@ -238,13 +237,13 @@ export const AnalyticsReportsPage: React.FC = () => {
           <button
             onClick={() => handleExport(activeTab === 'meals' ? 'mess_attendance' : 'hostel_attendance')}
             disabled={!!exporting}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 hover:text-white transition disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-[#FAF9F6] border border-[#E4E1DA] text-xs font-medium text-[#1C2430] transition disabled:opacity-50"
             title="Download CSV report for current view"
           >
             {exporting ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#26415C]" />
             ) : (
-              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <Download className="w-3.5 h-3.5 text-[#26415C]" />
             )}
             <span>Export CSV</span>
           </button>
@@ -252,163 +251,163 @@ export const AnalyticsReportsPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800">
-        {['SUPER_ADMIN', 'WARDEN'].includes(user?.role || '') && (
+      <div className="flex items-center gap-2 border-b border-[#E4E1DA]">
+        {['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER'].includes(user?.role || '') && (
           <button
             onClick={() => setActiveTab('occupancy')}
-            className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 transition ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium border-b-2 transition ${
               activeTab === 'occupancy'
-                ? 'border-sky-500 text-sky-400 bg-sky-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#26415C] text-[#26415C] bg-[#FAF9F6]'
+                : 'border-transparent text-[#5B6472] hover:text-[#1C2430]'
             }`}
           >
-            <Building className="w-4 h-4" />
-            <span>Hostel Occupancy & Traffic (10.4)</span>
+            <Building className="w-3.5 h-3.5" />
+            <span>Hostel occupancy & traffic</span>
           </button>
         )}
 
         {['SUPER_ADMIN', 'MESS_ADMIN'].includes(user?.role || '') && (
           <button
             onClick={() => setActiveTab('meals')}
-            className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 transition ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium border-b-2 transition ${
               activeTab === 'meals'
-                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#26415C] text-[#26415C] bg-[#FAF9F6]'
+                : 'border-transparent text-[#5B6472] hover:text-[#1C2430]'
             }`}
           >
-            <Utensils className="w-4 h-4" />
-            <span>Mess Turnout & Meals (10.5)</span>
+            <Utensils className="w-3.5 h-3.5" />
+            <span>Mess turnout & meals</span>
           </button>
         )}
 
         <button
           onClick={() => setActiveTab('exports')}
-          className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 transition ${
+          className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium border-b-2 transition ${
             activeTab === 'exports'
-              ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-[#26415C] text-[#26415C] bg-[#FAF9F6]'
+              : 'border-transparent text-[#5B6472] hover:text-[#1C2430]'
           }`}
         >
-          <Download className="w-4 h-4" />
-          <span>Report Downloads (10.6)</span>
+          <Download className="w-3.5 h-3.5" />
+          <span>Report downloads</span>
         </button>
       </div>
 
-      {/* TAB 1: HOSTEL OCCUPANCY ANALYTICS (10.4) */}
+      {/* TAB 1: HOSTEL OCCUPANCY ANALYTICS */}
       {activeTab === 'occupancy' && (
         <div className="space-y-6">
-          {/* Hostel Selector (Super Admin or Warden with multi hostels) */}
+          {/* Hostel Selector */}
           {hostelList.length > 1 && (
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5" />
-                Select Hostel:
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-[#5B6472] flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-[#26415C]" />
+                <span>Select hostel:</span>
               </label>
               <div className="relative">
                 <select
                   value={selectedHostelId}
                   onChange={(e) => setSelectedHostelId(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-1.5 pr-8 appearance-none focus:outline-none focus:border-sky-500 font-medium"
+                  className="bg-white border border-[#E4E1DA] text-[#1C2430] text-xs rounded px-3 py-1.5 pr-8 appearance-none focus:outline-none focus:border-[#26415C] font-medium"
                 >
-                  {user?.role === 'SUPER_ADMIN' && <option value="">All Hostels (Campus-wide)</option>}
+                  {user?.role === 'SUPER_ADMIN' && <option value="">All hostels (campus-wide)</option>}
                   {hostelList.map((h) => (
                     <option key={h.id} value={h.id}>
                       {h.code} — {h.name}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#5B6472] absolute right-2.5 top-2 pointer-events-none" />
               </div>
             </div>
           )}
 
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Total Gate Entries
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-[#5B6472]">
+                  Total gate entries
                 </span>
-                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <ArrowUpRight className="w-4 h-4" />
+                <div className="p-1 rounded bg-[#2E7D5B]/10 text-[#2E7D5B] border border-[#2E7D5B]/30">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {occupancyData?.summary.totalEntries.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-[#5B6472] mt-0.5">
                 Avg. {occupancyData?.summary.avgDailyEntries ?? 0} check-ins per day
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Total Gate Exits
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-[#5B6472]">
+                  Total gate exits
                 </span>
-                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  <ArrowDownRight className="w-4 h-4" />
+                <div className="p-1 rounded bg-[#B7791F]/10 text-[#B7791F] border border-[#B7791F]/30">
+                  <ArrowDownRight className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {occupancyData?.summary.totalExits.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-[#5B6472] mt-0.5">
                 Turnout over past {rangeDays} days
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Net Campus Flow
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-[#5B6472]">
+                  Net campus flow
                 </span>
-                <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  <Users className="w-4 h-4" />
+                <div className="p-1 rounded bg-[#26415C]/10 text-[#26415C] border border-[#26415C]/30">
+                  <Users className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-sky-400">
+              <div className="text-2xl font-serif font-medium text-[#26415C]">
                 {(occupancyData?.summary.totalEntries ?? 0) - (occupancyData?.summary.totalExits ?? 0) > 0 ? '+' : ''}
                 {(occupancyData?.summary.totalEntries ?? 0) - (occupancyData?.summary.totalExits ?? 0)}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-[#5B6472] mt-0.5">
                 Net ingress during observation period
               </p>
             </div>
           </div>
 
           {/* Interactive SVG Chart: Daily Entry vs Exit Footfall */}
-          <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4">
+          <div className="p-5 rounded-lg bg-white border border-[#E4E1DA] space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h3 className="font-bold text-white text-base">
-                  Daily Gate Ingress & Egress Footfall
+                <h3 className="font-serif font-medium text-[#1C2430] text-sm">
+                  Daily gate ingress & egress footfall
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#5B6472]">
                   Interactive timeline of authenticated entries vs exits. Hover columns to inspect figures.
                 </p>
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-3 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-                  <span className="text-slate-300">Entries</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#2E7D5B] inline-block" />
+                  <span className="text-[#5B6472]">Entries</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
-                  <span className="text-slate-300">Exits</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#B7791F] inline-block" />
+                  <span className="text-[#5B6472]">Exits</span>
                 </div>
               </div>
             </div>
 
             {loading ? (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs">
-                <RefreshCw className="w-6 h-6 animate-spin text-sky-400 mb-2" />
+              <div className="h-64 flex flex-col items-center justify-center text-[#5B6472] text-xs">
+                <RefreshCw className="w-6 h-6 animate-spin text-[#26415C] mb-2" />
                 Calculating occupancy curves...
               </div>
             ) : !occupancyData?.timeline || occupancyData.timeline.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
+              <div className="h-64 flex items-center justify-center text-[#5B6472] text-xs">
                 No attendance logs found in this date window.
               </div>
             ) : (
@@ -427,7 +426,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                       y1={y}
                       x2={occupancyData.timeline.length * 70}
                       y2={y}
-                      stroke="#1e293b"
+                      stroke="#E4E1DA"
                       strokeDasharray="4 4"
                       strokeWidth="1"
                     />
@@ -453,9 +452,9 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y="0"
                             width="50"
                             height="180"
-                            fill="#38bdf8"
-                            fillOpacity="0.08"
-                            rx="6"
+                            fill="#26415C"
+                            fillOpacity="0.05"
+                            rx="4"
                           />
                         )}
 
@@ -465,8 +464,8 @@ export const AnalyticsReportsPage: React.FC = () => {
                           y={170 - entryHeight}
                           width="14"
                           height={Math.max(2, entryHeight)}
-                          rx="3"
-                          fill="#10b981"
+                          rx="2"
+                          fill="#2E7D5B"
                           className="transition-all duration-300"
                         />
 
@@ -476,8 +475,8 @@ export const AnalyticsReportsPage: React.FC = () => {
                           y={170 - exitHeight}
                           width="14"
                           height={Math.max(2, exitHeight)}
-                          rx="3"
-                          fill="#f59e0b"
+                          rx="2"
+                          fill="#B7791F"
                           className="transition-all duration-300"
                         />
 
@@ -486,7 +485,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                           x={colX + 16}
                           y="190"
                           textAnchor="middle"
-                          className="text-[10px] fill-slate-400 font-mono"
+                          className="text-[10px] fill-[#5B6472] font-mono"
                         >
                           {pt.displayDate}
                         </text>
@@ -497,17 +496,17 @@ export const AnalyticsReportsPage: React.FC = () => {
 
                 {/* Tooltip Overlay */}
                 {hoveredOccIndex !== null && occupancyData.timeline[hoveredOccIndex] && (
-                  <div className="mt-3 p-3 bg-slate-950 border border-slate-700/80 rounded-xl flex items-center justify-between text-xs max-w-sm mx-auto shadow-2xl">
-                    <span className="font-bold text-white">
+                  <div className="mt-3 p-2.5 bg-white border border-[#E4E1DA] rounded-lg flex items-center justify-between text-xs max-w-sm mx-auto shadow-sm">
+                    <span className="font-medium text-[#1C2430]">
                       {occupancyData.timeline[hoveredOccIndex].displayDate}
                     </span>
-                    <span className="text-emerald-400 font-bold">
+                    <span className="text-[#2E7D5B] font-medium">
                       +{occupancyData.timeline[hoveredOccIndex].entries} In
                     </span>
-                    <span className="text-amber-400 font-bold">
+                    <span className="text-[#B7791F] font-medium">
                       -{occupancyData.timeline[hoveredOccIndex].exits} Out
                     </span>
-                    <span className="text-sky-400 font-semibold">
+                    <span className="text-[#26415C] font-medium">
                       Net: {occupancyData.timeline[hoveredOccIndex].netFlow}
                     </span>
                   </div>
@@ -518,36 +517,29 @@ export const AnalyticsReportsPage: React.FC = () => {
 
           {/* 24-Hour Peak Ingress / Egress Distribution */}
           {occupancyData?.hourlyPeaks && (
-            <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4">
+            <div className="p-5 rounded-lg bg-white border border-[#E4E1DA] space-y-4">
               <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-bold text-white text-base">
-                  Peak Traffic Hours (24-Hour Gate Heatmap)
+                <Clock className="w-4 h-4 text-[#26415C]" />
+                <h3 className="font-serif font-medium text-[#1C2430] text-sm">
+                  Peak traffic hours (24-hour gate distribution)
                 </h3>
               </div>
-              <p className="text-xs text-slate-400">
-                Aggregated distribution of entries & exits across 24 hours of the day to identify curfew and class-rush hours.
+              <p className="text-xs text-[#5B6472]">
+                Aggregated distribution of entries and exits across 24 hours of the day to identify curfew and rush hours.
               </p>
 
               <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 pt-2">
                 {occupancyData.hourlyPeaks.map((hp) => {
                   const totalHour = hp.entries + hp.exits;
-                  const intensity = Math.min(1, totalHour / 20);
                   return (
                     <div
                       key={hp.hour}
-                      className="p-2 rounded-xl border border-slate-800 bg-slate-950/60 text-center flex flex-col justify-between"
-                      style={{
-                        backgroundColor:
-                          totalHour > 0
-                            ? `rgba(56, 189, 248, ${Math.max(0.08, intensity * 0.35)})`
-                            : undefined,
-                      }}
+                      className="p-2 rounded border border-[#E4E1DA] bg-[#FAF9F6] text-center flex flex-col justify-between"
                       title={`${hp.hour}: ${hp.entries} In, ${hp.exits} Out`}
                     >
-                      <span className="text-[10px] font-mono text-slate-400">{hp.hour}</span>
-                      <span className="text-xs font-bold text-white my-1">{totalHour}</span>
-                      <span className="text-[9px] text-slate-400">
+                      <span className="text-[10px] font-mono text-[#5B6472]">{hp.hour}</span>
+                      <span className="text-xs font-medium text-[#1C2430] my-1">{totalHour}</span>
+                      <span className="text-[9px] text-[#5B6472]">
                         {hp.entries}↑ {hp.exits}↓
                       </span>
                     </div>
@@ -559,105 +551,105 @@ export const AnalyticsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: MESS TURNOUT & CONSUMPTION (10.5) */}
+      {/* TAB 2: MESS TURNOUT & CONSUMPTION */}
       {activeTab === 'meals' && (
         <div className="space-y-6">
           {/* Mess Selector */}
           {messList.length > 1 && (
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                <Utensils className="w-3.5 h-3.5" />
-                Select Mess:
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-[#5B6472] flex items-center gap-1.5">
+                <Utensils className="w-3.5 h-3.5 text-[#26415C]" />
+                <span>Select mess:</span>
               </label>
               <div className="relative">
                 <select
                   value={selectedMessId}
                   onChange={(e) => setSelectedMessId(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-1.5 pr-8 appearance-none focus:outline-none focus:border-emerald-500 font-medium"
+                  className="bg-white border border-[#E4E1DA] text-[#1C2430] text-xs rounded px-3 py-1.5 pr-8 appearance-none focus:outline-none focus:border-[#26415C] font-medium"
                 >
-                  {user?.role === 'SUPER_ADMIN' && <option value="">All Mess Counters</option>}
+                  {user?.role === 'SUPER_ADMIN' && <option value="">All mess counters</option>}
                   {messList.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#5B6472] absolute right-2.5 top-2 pointer-events-none" />
               </div>
             </div>
           )}
 
           {/* KPI Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider block mb-1">
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <span className="text-xs font-medium text-[#B7791F] block mb-1">
                 Breakfast
               </span>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {mealData?.summary.mealTypeCounts.BREAKFAST.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Meals served</p>
+              <p className="text-[11px] text-[#5B6472] mt-0.5">Meals served</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block mb-1">
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <span className="text-xs font-medium text-[#2E7D5B] block mb-1">
                 Lunch
               </span>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {mealData?.summary.mealTypeCounts.LUNCH.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Meals served</p>
+              <p className="text-[11px] text-[#5B6472] mt-0.5">Meals served</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider block mb-1">
-                Evening Snacks
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <span className="text-xs font-medium text-[#4C51BF] block mb-1">
+                Evening snacks
               </span>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {mealData?.summary.mealTypeCounts.SNACKS.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Meals served</p>
+              <p className="text-[11px] text-[#5B6472] mt-0.5">Meals served</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80">
-              <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider block mb-1">
+            <div className="p-4 rounded-lg bg-white border border-[#E4E1DA]">
+              <span className="text-xs font-medium text-[#26415C] block mb-1">
                 Dinner
               </span>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-serif font-medium text-[#1C2430]">
                 {mealData?.summary.mealTypeCounts.DINNER.toLocaleString() ?? '—'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Meals served</p>
+              <p className="text-[11px] text-[#5B6472] mt-0.5">Meals served</p>
             </div>
           </div>
 
           {/* Interactive Stacked Bar Chart: Meals By Day */}
-          <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4">
+          <div className="p-5 rounded-lg bg-white border border-[#E4E1DA] space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h3 className="font-bold text-white text-base">
-                  Daily Consumption Breakdown by Meal Window
+                <h3 className="font-serif font-medium text-[#1C2430] text-sm">
+                  Daily consumption breakdown by meal window
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#5B6472]">
                   Stacked distribution of daily authenticated scans. Total volume: {mealData?.summary.totalMealsServed ?? 0} meals.
                 </p>
               </div>
 
               {/* Legend */}
               <div className="flex items-center gap-3 text-xs flex-wrap">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /><span className="text-slate-300">Breakfast</span></span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /><span className="text-slate-300">Lunch</span></span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-400" /><span className="text-slate-300">Snacks</span></span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400" /><span className="text-slate-300">Dinner</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B7791F]" /><span className="text-[#5B6472]">Breakfast</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2E7D5B]" /><span className="text-[#5B6472]">Lunch</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#4C51BF]" /><span className="text-[#5B6472]">Snacks</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#26415C]" /><span className="text-[#5B6472]">Dinner</span></span>
               </div>
             </div>
 
             {loading ? (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs">
-                <RefreshCw className="w-6 h-6 animate-spin text-emerald-400 mb-2" />
+              <div className="h-64 flex flex-col items-center justify-center text-[#5B6472] text-xs">
+                <RefreshCw className="w-6 h-6 animate-spin text-[#26415C] mb-2" />
                 Aggregating mess trends...
               </div>
             ) : !mealData?.timeline || mealData.timeline.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
+              <div className="h-64 flex items-center justify-center text-[#5B6472] text-xs">
                 No mess scans recorded in this window.
               </div>
             ) : (
@@ -675,7 +667,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                       y1={y}
                       x2={mealData.timeline.length * 70}
                       y2={y}
-                      stroke="#1e293b"
+                      stroke="#E4E1DA"
                       strokeDasharray="4 4"
                       strokeWidth="1"
                     />
@@ -704,9 +696,9 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y="0"
                             width="44"
                             height="180"
-                            fill="#10b981"
-                            fillOpacity="0.08"
-                            rx="6"
+                            fill="#26415C"
+                            fillOpacity="0.05"
+                            rx="4"
                           />
                         )}
 
@@ -717,7 +709,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y={(currentY -= hB)}
                             width="24"
                             height={hB}
-                            fill="#f59e0b"
+                            fill="#B7791F"
                             rx="2"
                           />
                         )}
@@ -729,7 +721,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y={(currentY -= hL)}
                             width="24"
                             height={hL}
-                            fill="#10b981"
+                            fill="#2E7D5B"
                             rx="2"
                           />
                         )}
@@ -741,7 +733,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y={(currentY -= hS)}
                             width="24"
                             height={hS}
-                            fill="#38bdf8"
+                            fill="#4C51BF"
                             rx="2"
                           />
                         )}
@@ -753,7 +745,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                             y={(currentY -= hD)}
                             width="24"
                             height={hD}
-                            fill="#6366f1"
+                            fill="#26415C"
                             rx="2"
                           />
                         )}
@@ -763,7 +755,7 @@ export const AnalyticsReportsPage: React.FC = () => {
                           x={colX + 12}
                           y="190"
                           textAnchor="middle"
-                          className="text-[10px] fill-slate-400 font-mono"
+                          className="text-[10px] fill-[#5B6472] font-mono"
                         >
                           {pt.displayDate}
                         </text>
@@ -774,23 +766,23 @@ export const AnalyticsReportsPage: React.FC = () => {
 
                 {/* Tooltip */}
                 {hoveredMealIndex !== null && mealData.timeline[hoveredMealIndex] && (
-                  <div className="mt-3 p-3 bg-slate-950 border border-slate-700/80 rounded-xl flex items-center justify-between text-xs max-w-md mx-auto shadow-2xl">
-                    <span className="font-bold text-white">
+                  <div className="mt-3 p-2.5 bg-white border border-[#E4E1DA] rounded-lg flex items-center justify-between text-xs max-w-md mx-auto shadow-sm">
+                    <span className="font-medium text-[#1C2430]">
                       {mealData.timeline[hoveredMealIndex].displayDate}
                     </span>
-                    <span className="text-amber-400 font-semibold">
+                    <span className="text-[#B7791F] font-medium">
                       B: {mealData.timeline[hoveredMealIndex].BREAKFAST}
                     </span>
-                    <span className="text-emerald-400 font-semibold">
+                    <span className="text-[#2E7D5B] font-medium">
                       L: {mealData.timeline[hoveredMealIndex].LUNCH}
                     </span>
-                    <span className="text-sky-400 font-semibold">
+                    <span className="text-[#4C51BF] font-medium">
                       S: {mealData.timeline[hoveredMealIndex].SNACKS}
                     </span>
-                    <span className="text-indigo-400 font-semibold">
+                    <span className="text-[#26415C] font-medium">
                       D: {mealData.timeline[hoveredMealIndex].DINNER}
                     </span>
-                    <span className="text-white font-bold pl-2 border-l border-slate-800">
+                    <span className="text-[#1C2430] font-semibold pl-2 border-l border-[#E4E1DA]">
                       Total: {mealData.timeline[hoveredMealIndex].total}
                     </span>
                   </div>
@@ -801,29 +793,29 @@ export const AnalyticsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: EXPORT & AUDIT REPORTS (10.6) */}
+      {/* TAB 3: EXPORT & AUDIT REPORTS */}
       {activeTab === 'exports' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Card 1: Gate Attendance Audit Report */}
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+          <div className="p-6 rounded-lg bg-white border border-[#E4E1DA] flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-4">
-                <Building className="w-6 h-6" />
+              <div className="w-10 h-10 rounded bg-[#FAF9F6] border border-[#E4E1DA] text-[#26415C] flex items-center justify-center mb-3">
+                <Building className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-1">
-                Gate Entry & Exit Log Report
+              <h3 className="text-base font-serif font-medium text-[#1C2430] mb-1">
+                Gate entry & exit log report
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Full chronological audit trail of student movements across hostel gates. Includes student roll numbers, names, rooms, gates, directions (ENTRY / EXIT), and hardware kiosk device codes.
+              <p className="text-xs text-[#5B6472] leading-relaxed mb-4">
+                Full chronological audit trail of student movements across hostel gates. Includes student roll numbers, names, rooms, gates, directions (Entry / Exit), and hardware kiosk device codes.
               </p>
-              <div className="p-3 bg-slate-950 rounded-xl text-xs text-slate-300 space-y-1 mb-4">
+              <div className="p-3 bg-[#FAF9F6] rounded border border-[#E4E1DA] text-xs text-[#5B6472] space-y-1 mb-4">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Date Coverage:</span>
-                  <span className="font-mono text-white">Last {rangeDays} Days</span>
+                  <span>Date coverage:</span>
+                  <span className="font-mono text-[#1C2430]">Last {rangeDays} days</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Export Format:</span>
-                  <span className="font-mono text-emerald-400">RFC-4180 CSV</span>
+                  <span>Export format:</span>
+                  <span className="font-mono text-[#2E7D5B]">RFC-4180 CSV</span>
                 </div>
               </div>
             </div>
@@ -831,37 +823,37 @@ export const AnalyticsReportsPage: React.FC = () => {
             <button
               onClick={() => handleExport('hostel_attendance')}
               disabled={exporting === 'hostel_attendance'}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-sky-500/20 disabled:opacity-50"
+              className="w-full py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {exporting === 'hostel_attendance' ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
               )}
-              <span>Download Gate Attendance CSV</span>
+              <span>Download gate attendance CSV</span>
             </button>
           </div>
 
           {/* Card 2: Mess Attendance & Meal Report */}
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+          <div className="p-6 rounded-lg bg-white border border-[#E4E1DA] flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
-                <Utensils className="w-6 h-6" />
+              <div className="w-10 h-10 rounded bg-[#FAF9F6] border border-[#E4E1DA] text-[#26415C] flex items-center justify-center mb-3">
+                <Utensils className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-1">
-                Mess Turnout & Meal Consumption Report
+              <h3 className="text-base font-serif font-medium text-[#1C2430] mb-1">
+                Mess turnout & meal consumption report
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              <p className="text-xs text-[#5B6472] leading-relaxed mb-4">
                 Detailed record of authenticated meal claims. Contains student IDs, meal windows (Breakfast, Lunch, Snacks, Dinner), timestamp of redemption, and kiosk verification status.
               </p>
-              <div className="p-3 bg-slate-950 rounded-xl text-xs text-slate-300 space-y-1 mb-4">
+              <div className="p-3 bg-[#FAF9F6] rounded border border-[#E4E1DA] text-xs text-[#5B6472] space-y-1 mb-4">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Date Coverage:</span>
-                  <span className="font-mono text-white">Last {rangeDays} Days</span>
+                  <span>Date coverage:</span>
+                  <span className="font-mono text-[#1C2430]">Last {rangeDays} days</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Export Format:</span>
-                  <span className="font-mono text-emerald-400">RFC-4180 CSV</span>
+                  <span>Export format:</span>
+                  <span className="font-mono text-[#2E7D5B]">RFC-4180 CSV</span>
                 </div>
               </div>
             </div>
@@ -869,14 +861,14 @@ export const AnalyticsReportsPage: React.FC = () => {
             <button
               onClick={() => handleExport('mess_attendance')}
               disabled={exporting === 'mess_attendance'}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="w-full py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {exporting === 'mess_attendance' ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
               )}
-              <span>Download Mess Consumption CSV</span>
+              <span>Download mess consumption CSV</span>
             </button>
           </div>
         </div>

@@ -1,29 +1,38 @@
 import prisma from '../prisma.js';
 import { z } from 'zod';
+import { getUserMessIds, userHasMessAccess } from '../utils/roleScoping.js';
 
-// Zod schemas
+// Zod schemas — mess_admin_id removed (staff assignments are separate)
 const createMessSchema = z.object({
   name: z.string().min(1).max(120),
   hostel_id: z.string().uuid().optional().nullable(),
-  mess_admin_id: z.string().uuid().optional().nullable(),
 });
 
 const updateMessSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   hostel_id: z.string().uuid().optional().nullable(),
-  mess_admin_id: z.string().uuid().optional().nullable(),
 });
 
 // 4.4 List all messes
 export async function listMesses(req, res) {
   try {
+    // Scope by staff mess assignments for non-super-admins
+    const messIds = getUserMessIds(req.user);
+    const where = {};
+    if (messIds !== null) {
+      where.id = { in: messIds };
+    }
+
     const messes = await prisma.mess.findMany({
+      where,
       include: {
         hostel: {
           select: { id: true, name: true, code: true },
         },
-        mess_admin: {
-          select: { id: true, name: true, email: true },
+        staff_mess_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         _count: {
           select: { meal_windows: true, devices: true },
@@ -55,22 +64,16 @@ export async function createMess(req, res) {
       }
     }
 
-    // Validate mess_admin_id if provided
-    if (parsed.data.mess_admin_id) {
-      const admin = await prisma.user.findUnique({ where: { id: parsed.data.mess_admin_id } });
-      if (!admin || admin.role !== 'MESS_ADMIN') {
-        return res.status(400).json({ error: 'Invalid mess_admin_id: user not found or not a MESS_ADMIN' });
-      }
-    }
-
     const mess = await prisma.mess.create({
       data: parsed.data,
       include: {
         hostel: {
           select: { id: true, name: true, code: true },
         },
-        mess_admin: {
-          select: { id: true, name: true, email: true },
+        staff_mess_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         _count: {
           select: { meal_windows: true, devices: true },
@@ -110,8 +113,10 @@ export async function getMess(req, res) {
         hostel: {
           select: { id: true, name: true, code: true },
         },
-        mess_admin: {
-          select: { id: true, name: true, email: true },
+        staff_mess_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         meal_windows: {
           orderBy: { start_time: 'asc' },
@@ -164,14 +169,6 @@ export async function updateMess(req, res) {
       }
     }
 
-    // Validate mess_admin_id if provided
-    if (parsed.data.mess_admin_id) {
-      const admin = await prisma.user.findUnique({ where: { id: parsed.data.mess_admin_id } });
-      if (!admin || admin.role !== 'MESS_ADMIN') {
-        return res.status(400).json({ error: 'Invalid mess_admin_id: user not found or not a MESS_ADMIN' });
-      }
-    }
-
     const mess = await prisma.mess.update({
       where: { id },
       data: parsed.data,
@@ -179,8 +176,10 @@ export async function updateMess(req, res) {
         hostel: {
           select: { id: true, name: true, code: true },
         },
-        mess_admin: {
-          select: { id: true, name: true, email: true },
+        staff_mess_assignments: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
         },
         _count: {
           select: { meal_windows: true, devices: true },

@@ -1,5 +1,6 @@
 import prisma from '../prisma.js';
 import { resolveMealWindow } from '../services/mealWindowService.js';
+import { getUserHostelIds, getUserMessIds } from '../utils/roleScoping.js';
 
 /**
  * Helper to get today's start and end timestamps
@@ -127,8 +128,9 @@ export async function getWardenDashboard(req, res) {
     const { hostelId } = req.query;
 
     let hostelFilter = {};
-    if (user.role === 'WARDEN') {
-      hostelFilter = { warden_id: user.id };
+    const scopedHostelIds = getUserHostelIds(user);
+    if (scopedHostelIds !== null) {
+      hostelFilter = { id: { in: scopedHostelIds } };
     }
     if (hostelId) {
       hostelFilter = { ...hostelFilter, id: hostelId };
@@ -228,8 +230,9 @@ export async function getMessAdminDashboard(req, res) {
     const { start: todayStart, end: todayEnd } = getTodayRange();
 
     let messFilter = {};
-    if (user.role === 'MESS_ADMIN') {
-      messFilter = { mess_admin_id: user.id };
+    const messIds = getUserMessIds(user);
+    if (messIds !== null) {
+      messFilter = { id: { in: messIds } };
     }
     if (messId) {
       messFilter = { ...messFilter, id: messId };
@@ -371,12 +374,9 @@ export async function getAttendanceHistory(req, res) {
       let where = { ...dateFilter };
 
       // Role scoping
-      if (user.role === 'WARDEN') {
-        const wardenHostels = await prisma.hostel.findMany({
-          where: { warden_id: user.id },
-          select: { id: true },
-        });
-        where.hostel_id = { in: wardenHostels.map((h) => h.id) };
+      const scopedHostelIds = getUserHostelIds(user);
+      if (scopedHostelIds !== null) {
+        where.hostel_id = { in: scopedHostelIds };
       }
 
       if (hostel_id) where.hostel_id = hostel_id;
@@ -424,12 +424,9 @@ export async function getAttendanceHistory(req, res) {
       let where = { ...dateFilter };
 
       // Role scoping
-      if (user.role === 'MESS_ADMIN') {
-        const adminMesses = await prisma.mess.findMany({
-          where: { mess_admin_id: user.id },
-          select: { id: true },
-        });
-        where.mess_id = { in: adminMesses.map((m) => m.id) };
+      const scopedMessIds = getUserMessIds(user);
+      if (scopedMessIds !== null) {
+        where.mess_id = { in: scopedMessIds };
       }
 
       if (mess_id) where.mess_id = mess_id;

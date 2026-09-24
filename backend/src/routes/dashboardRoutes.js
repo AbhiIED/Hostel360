@@ -15,13 +15,13 @@ router.use(authenticate);
 // 8.6 Super Admin KPIs & Global Feed
 router.get('/admin', authorize('SUPER_ADMIN'), getSuperAdminDashboard);
 
-// 8.2 & 8.3 Warden Live Feed & Occupancy Panels
-router.get('/warden', authorize('SUPER_ADMIN', 'WARDEN'), getWardenDashboard);
+// 8.2 & 8.3 Warden/Vice Warden/Caretaker Live Feed & Occupancy Panels
+router.get('/warden', authorize('SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER'), getWardenDashboard);
 
 // 8.4 & 8.5 Mess Admin Live Feed & Daily Meal Counts
 router.get('/mess-admin', authorize('SUPER_ADMIN', 'MESS_ADMIN'), getMessAdminDashboard);
 
 // 8.7 Searchable & Paginated Attendance History
-router.get('/history', authorize('SUPER_ADMIN', 'WARDEN', 'MESS_ADMIN'), getAttendanceHistory);
+router.get('/history', authorize('SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN'), getAttendanceHistory);
 
 export default router;

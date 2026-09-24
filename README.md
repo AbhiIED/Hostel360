@@ -7,7 +7,7 @@ HOSTEL360 is a full-stack, real-time management system for college hostels and m
 ## Tech Stack
 - **Frontend**: React.js, Tailwind CSS, Socket.IO Client, Lucide Icons, Vite
 - **Backend**: Node.js, Express, Prisma ORM, MySQL 8+, Socket.IO, JWT (access + refresh), bcrypt
-- **Architecture & Design**: See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Architecture & Design**: See [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Roadmap & Checklist**: See [docs/FEATURES.md](docs/FEATURES.md)
 - **Work Progress Log**: See [docs/PROGRESS.md](docs/PROGRESS.md)
 

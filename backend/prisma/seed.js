@@ -48,6 +48,18 @@ async function main() {
     },
   });
 
+  const wardenH5 = await prisma.user.upsert({
+    where: { email: 'warden.h5@hostel360.com' },
+    update: {},
+    create: {
+      name: 'Dr. V. K. Verma (Warden - H5)',
+      email: 'warden.h5@hostel360.com',
+      password_hash: commonPasswordHash,
+      role: 'WARDEN',
+      is_active: true,
+    },
+  });
+
   // 3. Mess Admin User
   const messAdminUser = await prisma.user.upsert({
     where: { email: 'messadmin@hostel360.com' },
@@ -67,7 +79,7 @@ async function main() {
     { num: 2, code: 'H2', name: 'Vikram Sarabhai Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 176, wardenId: wardenBoys.id },
     { num: 3, code: 'H3', name: 'Hostel No. 3', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120, wardenId: wardenBoys.id },
     { num: 4, code: 'H4', name: 'Hostel No. 4', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 120, wardenId: wardenBoys.id },
-    { num: 5, code: 'H5', name: 'Mokshagundam Visvesvarayya Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80, wardenId: wardenBoys.id },
+    { num: 5, code: 'H5', name: 'Mokshagundam Visvesvarayya Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80, wardenId: wardenH5.id },
     { num: 6, code: 'H6', name: 'Jagadish Chandra Bose Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 80, wardenId: wardenBoys.id },
     { num: 7, code: 'H7', name: 'Kalpana Chawla Bhawan', type: 'GIRLS', has_blocks: false, location: 'MANIT Girls Hostel Complex', capacity: 144, wardenId: wardenGirls.id },
     { num: 8, code: 'H8', name: 'Ramanujan Bhawan', type: 'BOYS', has_blocks: false, location: 'MANIT Campus, Bhopal', capacity: 260, wardenId: wardenBoys.id },

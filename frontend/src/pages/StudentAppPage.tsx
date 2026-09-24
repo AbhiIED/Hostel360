@@ -18,6 +18,7 @@ import {
   VideoOff,
   User,
   Clock,
+  ClipboardPaste,
 } from 'lucide-react';
 
 interface StudentProfile {
@@ -191,29 +192,55 @@ export const StudentAppPage: React.FC = () => {
   };
 
   // Start Camera for scanning
-  const startCamera = async () => {
+  const startCamera = () => {
     setCameraError(null);
     setScanResult(null);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true');
-        await videoRef.current.play();
-        setCameraActive(true);
-        requestAnimationFrame(tickScan);
-      }
-    } catch (err: any) {
-      console.error('Camera access error:', err);
-      setCameraError('Camera access denied or unavailable. You can use the manual token option below.');
-      setCameraActive(false);
-    }
+    setCameraActive(true);
   };
+
+  // Camera stream lifecycle effect
+  useEffect(() => {
+    if (!cameraActive) return;
+
+    let isMounted = true;
+
+    async function initCameraStream() {
+      setCameraError(null);
+      try {
+        if (!navigator?.mediaDevices?.getUserMedia) {
+          throw new Error('Camera access is not supported by your browser or secure context (HTTPS/localhost). Please use the manual token input below.');
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+
+        if (!isMounted) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.setAttribute('playsinline', 'true');
+          await videoRef.current.play();
+          animationFrameRef.current = requestAnimationFrame(tickScan);
+        }
+      } catch (err: any) {
+        console.error('Camera access error:', err);
+        setCameraError(err.message || 'Camera access denied or unavailable. Please use the manual token option below.');
+        setCameraActive(false);
+      }
+    }
+
+    initCameraStream();
+
+    return () => {
+      isMounted = false;
+      stopCamera();
+    };
+  }, [cameraActive, stopCamera]);
 
   // QR Scanning Animation Loop with jsQR
   const tickScan = () => {
@@ -252,9 +279,6 @@ export const StudentAppPage: React.FC = () => {
     if (activeTab !== 'scan') {
       stopCamera();
     }
-    return () => {
-      stopCamera();
-    };
   }, [activeTab, stopCamera]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -262,6 +286,20 @@ export const StudentAppPage: React.FC = () => {
     if (manualToken.trim()) {
       submitToken(manualToken.trim());
       setManualToken('');
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setManualToken(text.trim());
+          submitToken(text.trim());
+        }
+      }
+    } catch (e) {
+      console.warn('Clipboard read failed:', e);
     }
   };
 
@@ -550,13 +588,13 @@ export const StudentAppPage: React.FC = () => {
 
             {/* Manual Token Fallback */}
             <div className="mt-8 pt-6 border-t border-slate-800/80 text-left">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Test / Manual Token Input
                 </label>
-                <span className="text-[11px] text-slate-500">For testing without a camera</span>
+                <span className="text-[11px] text-slate-500">For testing on a single screen without a mobile camera</span>
               </div>
-              <form onSubmit={handleManualSubmit} className="flex gap-2">
+              <form onSubmit={handleManualSubmit} className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   placeholder="Paste 64-character token..."
@@ -564,13 +602,24 @@ export const StudentAppPage: React.FC = () => {
                   onChange={(e) => setManualToken(e.target.value)}
                   className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-sky-500"
                 />
-                <button
-                  type="submit"
-                  disabled={isScanning || !manualToken.trim()}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs transition border border-slate-700 disabled:opacity-40"
-                >
-                  {isScanning ? 'Verifying...' : 'Submit Token'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePasteFromClipboard}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs transition border border-slate-700 flex items-center gap-1.5"
+                    title="Paste token from clipboard and verify"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Paste & Scan</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isScanning || !manualToken.trim()}
+                    className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition shadow-md shadow-sky-600/20 disabled:opacity-40"
+                  >
+                    {isScanning ? 'Verifying...' : 'Submit'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>

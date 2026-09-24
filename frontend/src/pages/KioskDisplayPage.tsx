@@ -19,6 +19,7 @@ import {
   WifiOff,
   SlidersHorizontal,
   X,
+  Copy,
 } from 'lucide-react';
 
 interface DeviceMetadata {
@@ -95,6 +96,7 @@ export const KioskDisplayPage: React.FC = () => {
   const [secondsLeft, setSecondsLeft] = useState<number>(20);
   const [isRotating, setIsRotating] = useState<boolean>(false);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<boolean>(false);
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isSocketConnected, setIsSocketConnected] = useState<boolean>(false);
@@ -521,13 +523,27 @@ export const KioskDisplayPage: React.FC = () => {
                     </div>
                   </div>
                 ) : qrToken ? (
-                  <QRCodeSVG
-                    value={qrToken}
-                    size={280}
-                    level="H"
-                    includeMargin={false}
-                    className="w-56 h-56 sm:w-72 sm:h-72 transition-opacity duration-300"
-                  />
+                  <div className="flex flex-col items-center">
+                    <QRCodeSVG
+                      value={qrToken}
+                      size={280}
+                      level="H"
+                      includeMargin={false}
+                      className="w-56 h-56 sm:w-72 sm:h-72 transition-opacity duration-300"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(qrToken);
+                        setCopiedToken(true);
+                        setTimeout(() => setCopiedToken(false), 2500);
+                      }}
+                      className="mt-3 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-sky-300 text-xs font-mono border border-slate-700/60 flex items-center gap-1.5 transition"
+                      title="Copy active token string for manual testing in Student App"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-sky-400" />
+                      <span>{copiedToken ? '✓ Copied to Clipboard!' : 'Copy Token (Test on Student App)'}</span>
+                    </button>
+                  </div>
                 ) : (
                   <div className="w-56 h-56 sm:w-72 sm:h-72 flex flex-col items-center justify-center text-slate-400">
                     <RefreshCw className="w-8 h-8 animate-spin text-sky-500 mb-2" />

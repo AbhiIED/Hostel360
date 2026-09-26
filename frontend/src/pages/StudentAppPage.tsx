@@ -15,6 +15,11 @@ import {
   FlipHorizontal,
   VideoOff,
   ClipboardPaste,
+  FileText,
+  Wifi,
+  Send,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 
 interface StudentProfile {
@@ -67,11 +72,23 @@ interface MessAttendanceLog {
 }
 
 export const StudentAppPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'mess'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'mess' | 'leave'>('scan');
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [hostelLogs, setHostelLogs] = useState<HostelAttendanceLog[]>([]);
   const [messLogs, setMessLogs] = useState<MessAttendanceLog[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [wifiHint, setWifiHint] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Leave Form State
+  const [leaveForm, setLeaveForm] = useState({
+    requested_from: '',
+    requested_to: '',
+    reason: '',
+  });
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null);
 
   // Scanner State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
@@ -94,6 +111,28 @@ export const StudentAppPage: React.FC = () => {
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const fetchLeaveData = useCallback(async () => {
+    try {
+      const res = await api.get('/curfew/leave-requests/self');
+      setLeaveRequests(res.data.requests || []);
+    } catch (err) {
+      console.error('Error fetching leave requests:', err);
+    }
+  }, []);
+
+  const fetchWifiHint = useCallback(async (studentId: string) => {
+    try {
+      const res = await api.get(`/curfew/presence-hint/${studentId}`);
+      if (res.data.inside && res.data.hint) {
+        setWifiHint(res.data.hint);
+      } else {
+        setWifiHint(null);
+      }
+    } catch (err) {
+      setWifiHint(null);
+    }
+  }, []);
+
   // Fetch student self data
   const fetchStudentData = useCallback(async () => {
     try {
@@ -101,16 +140,65 @@ export const StudentAppPage: React.FC = () => {
       setProfile(res.data.student);
       setHostelLogs(res.data.hostel_logs || []);
       setMessLogs(res.data.mess_logs || []);
+      if (res.data.student?.id) {
+        fetchWifiHint(res.data.student.id);
+      }
+      fetchLeaveData();
     } catch (err: any) {
       console.error('Error fetching student data:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchLeaveData, fetchWifiHint]);
 
   useEffect(() => {
     fetchStudentData();
   }, [fetchStudentData]);
+
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveForm.requested_from || !leaveForm.requested_to || !leaveForm.reason.trim()) {
+      setLeaveError('Please specify departure date/time, return date/time, and reason');
+      return;
+    }
+
+    const from = new Date(leaveForm.requested_from);
+    const to = new Date(leaveForm.requested_to);
+
+    if (from >= to) {
+      setLeaveError('Return date must be chronologically after departure date');
+      return;
+    }
+
+    setLeaveSubmitting(true);
+    setLeaveError(null);
+    setLeaveSuccess(null);
+
+    try {
+      await api.post('/curfew/leave-requests', {
+        requested_from: from.toISOString(),
+        requested_to: to.toISOString(),
+        reason: leaveForm.reason.trim(),
+      });
+      setLeaveSuccess('Out-pass request submitted successfully (Pending Warden review)');
+      setLeaveForm({ requested_from: '', requested_to: '', reason: '' });
+      fetchLeaveData();
+    } catch (err: any) {
+      setLeaveError(err.response?.data?.error || 'Failed to submit leave request');
+    } finally {
+      setLeaveSubmitting(false);
+    }
+  };
+
+  const handleCancelLeave = async (id: string) => {
+    if (!window.confirm('Are you sure you want to cancel this out-pass request?')) return;
+    try {
+      await api.patch(`/curfew/leave-requests/${id}/cancel`);
+      fetchLeaveData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to cancel leave request');
+    }
+  };
 
   // Stop camera stream helper
   const stopCamera = useCallback(() => {
@@ -395,15 +483,24 @@ export const StudentAppPage: React.FC = () => {
             <p className="text-[11px] text-[#5B6472] mt-1.5 text-center sm:text-right">
               Next scan records {isInside ? 'exit' : 'entry'}
             </p>
+            {isInside && wifiHint && (
+              <div
+                className="mt-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-800"
+                title="Advisory presence signal from campus WiFi controller. Advisory only; never used for attendance or alerts."
+              >
+                <Wifi className="w-3 h-3 text-[#2E7D5B]" />
+                <span>{wifiHint}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* 2. Lean Segmented Tab Navigation */}
-      <div className="flex items-center gap-3 border-b border-[#E4E1DA] pb-2 mb-6 text-xs">
+      <div className="flex items-center gap-3 border-b border-[#E4E1DA] pb-2 mb-6 text-xs overflow-x-auto">
         <button
           onClick={() => setActiveTab('scan')}
-          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition whitespace-nowrap ${
             activeTab === 'scan'
               ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
               : 'text-[#5B6472] hover:text-[#1C2430]'
@@ -415,7 +512,7 @@ export const StudentAppPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition whitespace-nowrap ${
             activeTab === 'history'
               ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
               : 'text-[#5B6472] hover:text-[#1C2430]'
@@ -427,7 +524,7 @@ export const StudentAppPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('mess')}
-          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition ${
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition whitespace-nowrap ${
             activeTab === 'mess'
               ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
               : 'text-[#5B6472] hover:text-[#1C2430]'
@@ -435,6 +532,18 @@ export const StudentAppPage: React.FC = () => {
         >
           <Utensils className="w-3.5 h-3.5" />
           <span>Dining log ({messLogs.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('leave')}
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition whitespace-nowrap ${
+            activeTab === 'leave'
+              ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
+              : 'text-[#5B6472] hover:text-[#1C2430]'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Out-pass / Leave ({leaveRequests.length})</span>
         </button>
       </div>
 
@@ -708,6 +817,210 @@ export const StudentAppPage: React.FC = () => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 6. Tab 4: Out-Pass & Leave Requests */}
+      {activeTab === 'leave' && (
+        <div className="space-y-6">
+          {/* Request Form Card */}
+          <div className="bg-white border border-[#E4E1DA] rounded-lg p-6">
+            <div className="flex items-center gap-3 pb-3 mb-4 border-b border-[#E4E1DA]">
+              <div className="w-8 h-8 rounded bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#1D4ED8]">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="font-serif text-base font-medium text-[#1C2430]">
+                  Submit Out-Pass / Leave Request
+                </h2>
+                <p className="text-xs text-[#5B6472] mt-0.5">
+                  Authorized out-passes automatically suppress curfew alerts during your night out.
+                </p>
+              </div>
+            </div>
+
+            {leaveSuccess && (
+              <div className="mb-4 p-3 bg-[#DEF7EC] border border-[#84E1BC] text-[#03543F] rounded text-xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{leaveSuccess}</span>
+                </div>
+                <button onClick={() => setLeaveSuccess(null)} className="text-[#03543F]">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {leaveError && (
+              <div className="mb-4 p-3 bg-[#FEF2F2] border border-[#FCA5A5] text-[#DC2626] rounded text-xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{leaveError}</span>
+                </div>
+                <button onClick={() => setLeaveError(null)} className="text-[#DC2626]">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <form onSubmit={handleLeaveSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium text-[#1C2430] mb-1">
+                    Departure Date & Time <span className="text-[#DC2626]">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={leaveForm.requested_from}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, requested_from: e.target.value })}
+                    className="w-full p-2.5 border border-[#E4E1DA] rounded font-mono text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-[#1C2430] mb-1">
+                    Expected Return Date & Time <span className="text-[#DC2626]">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={leaveForm.requested_to}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, requested_to: e.target.value })}
+                    className="w-full p-2.5 border border-[#E4E1DA] rounded font-mono text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-[#1C2430] mb-1">
+                  Purpose / Reason for Leave <span className="text-[#DC2626]">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="e.g. Traveling home for weekend festival, hackathon participation in Bhopal, or family emergency"
+                  value={leaveForm.reason}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                  className="w-full p-2.5 border border-[#E4E1DA] rounded text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={leaveSubmitting}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#26415C] text-white rounded font-medium hover:bg-[#1B2E42] transition disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{leaveSubmitting ? 'Submitting...' : 'Submit Request'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* History Card */}
+          <div className="bg-white border border-[#E4E1DA] rounded-lg p-6">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#E4E1DA]">
+              <h2 className="font-serif text-base font-medium text-[#1C2430]">
+                Your Out-Pass History
+              </h2>
+              <span className="text-xs text-[#5B6472] font-mono tabular-nums">
+                {leaveRequests.length} requests
+              </span>
+            </div>
+
+            {leaveRequests.length === 0 ? (
+              <p className="py-8 text-center text-xs text-[#5B6472]">
+                You have not submitted any out-pass requests yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E4E1DA] text-[#5B6472]">
+                      <th className="py-2.5 font-medium">Period</th>
+                      <th className="py-2.5 font-medium">Reason</th>
+                      <th className="py-2.5 font-medium">Status</th>
+                      <th className="py-2.5 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E4E1DA]">
+                    {leaveRequests.map((req) => {
+                      const fromDate = new Date(req.requested_from);
+                      const toDate = new Date(req.requested_to);
+                      const now = new Date();
+                      const canCancel = (req.status === 'PENDING' || req.status === 'APPROVED') && now < fromDate;
+
+                      return (
+                        <tr key={req.id} className="hover:bg-[#FAF9F6] transition">
+                          <td className="py-3 font-mono text-[#1C2430] tabular-nums whitespace-nowrap">
+                            <div>
+                              {fromDate.toLocaleString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                            <div className="text-[11px] text-[#5B6472]">
+                              to{' '}
+                              {toDate.toLocaleString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </td>
+
+                          <td className="py-3 max-w-xs">
+                            <p className="line-clamp-2 text-[#1C2430]" title={req.reason}>
+                              {req.reason}
+                            </p>
+                          </td>
+
+                          <td className="py-3">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider ${
+                                req.status === 'PENDING'
+                                  ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]'
+                                  : req.status === 'APPROVED'
+                                  ? 'bg-[#DEF7EC] text-[#03543F] border border-[#84E1BC]'
+                                  : req.status === 'REJECTED'
+                                  ? 'bg-[#FDE8E8] text-[#9B1C1C] border border-[#F8B4B4]'
+                                  : 'bg-[#F3F4F6] text-[#4B5563] border border-[#E5E7EB]'
+                              }`}
+                            >
+                              {req.status}
+                            </span>
+                            {req.approver && (
+                              <div className="text-[10px] text-[#5B6472] mt-0.5">
+                                Verified by {req.approver.name}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 text-right">
+                            {canCancel ? (
+                              <button
+                                onClick={() => handleCancelLeave(req.id)}
+                                className="px-2.5 py-1 text-xs text-[#DC2626] hover:bg-[#FEF2F2] border border-[#FCA5A5] rounded transition font-medium"
+                              >
+                                Cancel
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-[#5B6472]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

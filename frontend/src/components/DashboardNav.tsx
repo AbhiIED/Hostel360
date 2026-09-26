@@ -10,6 +10,7 @@ import {
   Laptop,
   History,
   TrendingUp,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const DashboardNav: React.FC = () => {
@@ -56,6 +57,12 @@ export const DashboardNav: React.FC = () => {
       path: '/dashboard/devices',
       icon: Laptop,
       roles: ['SUPER_ADMIN'],
+    },
+    {
+      label: 'Curfew rules',
+      path: '/dashboard/curfew',
+      icon: ShieldAlert,
+      roles: ['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER'],
     },
     {
       label: 'Audit history',

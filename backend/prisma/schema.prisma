@@ -68,6 +68,35 @@ enum ActorType {
   SYSTEM
 }
 
+enum DayType {
+  EVERYDAY
+  WEEKDAY
+  WEEKEND
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CurfewAlertType {
+  OVERNIGHT_NOT_RETURNED
+  EXIT_DURING_CURFEW
+}
+
+enum CurfewAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum DevicePresenceEventType {
+  CONNECTED
+  DISCONNECTED
+}
+
 model User {
   id            String         @id @default(uuid())
   name          String         @db.VarChar(120)
@@ -78,11 +107,14 @@ model User {
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 
-  student                 Student?
+  student                  Student?
   staff_hostel_assignments StaffHostelAssignment[]
   staff_mess_assignments   StaffMessAssignment[]
-  registered_devices       Device[]       @relation("UserRegisteredDevices")
+  registered_devices       Device[]                @relation("UserRegisteredDevices")
   refresh_tokens           RefreshToken[]
+  updated_curfew_windows   CurfewWindow[]          @relation("UserUpdatedCurfewWindows")
+  approved_leave_requests  LeaveRequest[]          @relation("UserApprovedLeaveRequests")
+  resolved_curfew_alerts   CurfewAlert[]           @relation("UserResolvedCurfewAlerts")
 
   @@map("users")
 }
@@ -101,11 +133,15 @@ model Student {
   room          Room         @relation(fields: [room_id], references: [id])
   photo_url     String?      @db.VarChar(512)
   current_state StudentState @default(INSIDE)
+  state_since   DateTime     @default(now())
   created_at    DateTime     @default(now())
   updated_at    DateTime     @updatedAt
 
-  hostel_attendance HostelAttendance[]
-  mess_attendance   MessAttendance[]
+  hostel_attendance       HostelAttendance[]
+  mess_attendance         MessAttendance[]
+  leave_requests          LeaveRequest[]
+  curfew_alerts           CurfewAlert[]
+  device_presence_signals DevicePresenceSignal[]
 
   @@map("students")
 }
@@ -127,6 +163,10 @@ model Hostel {
   messes                   Mess[]
   hostel_attendance        HostelAttendance[]
   staff_hostel_assignments StaffHostelAssignment[]
+  curfew_windows           CurfewWindow[]
+  leave_requests           LeaveRequest[]
+  curfew_alerts            CurfewAlert[]
+  device_presence_signals  DevicePresenceSignal[]
 
   @@map("hostels")
 }
@@ -256,6 +296,8 @@ model HostelAttendance {
   qr_token_id String
   qr_token    QrToken             @relation(fields: [qr_token_id], references: [id])
 
+  curfew_alerts CurfewAlert[]
+
   @@index([student_id, scanned_at])
   @@index([hostel_id, scanned_at])
   @@map("hostel_attendance")
@@ -341,3 +383,88 @@ model StaffMessAssignment {
   @@index([mess_id])
   @@map("staff_mess_assignments")
 }
+
+model CurfewWindow {
+  id                   String   @id @default(uuid())
+  hostel_id            String?
+  hostel               Hostel?  @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  day_type             DayType  @default(EVERYDAY)
+  start_time           String   @db.VarChar(8)
+  end_time             String   @db.VarChar(8)
+  grace_period_minutes Int      @default(30)
+  is_active            Boolean  @default(true)
+  updated_by           String?
+  updater              User?    @relation("UserUpdatedCurfewWindows", fields: [updated_by], references: [id], onDelete: SetNull)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@index([hostel_id, is_active])
+  @@map("curfew_windows")
+}
+
+model LeaveRequest {
+  id             String             @id @default(uuid())
+  student_id     String
+  student        Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  hostel_id      String
+  hostel         Hostel             @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  requested_from DateTime
+  requested_to   DateTime
+  reason         String             @db.Text
+  status         LeaveRequestStatus @default(PENDING)
+  approved_by    String?
+  approver       User?              @relation("UserApprovedLeaveRequests", fields: [approved_by], references: [id], onDelete: SetNull)
+  approved_at    DateTime?
+  created_at     DateTime           @default(now())
+  updated_at     DateTime           @updatedAt
+
+  curfew_alerts CurfewAlert[]
+
+  @@index([student_id, status])
+  @@index([hostel_id, status])
+  @@index([requested_from, requested_to])
+  @@map("leave_requests")
+}
+
+model CurfewAlert {
+  id                    String            @id @default(uuid())
+  student_id            String
+  student               Student           @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  hostel_id             String
+  hostel                Hostel            @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  alert_type            CurfewAlertType
+  triggered_at          DateTime          @default(now())
+  related_attendance_id String?
+  related_attendance    HostelAttendance? @relation(fields: [related_attendance_id], references: [id], onDelete: SetNull)
+  leave_request_id      String?
+  leave_request         LeaveRequest?     @relation(fields: [leave_request_id], references: [id], onDelete: SetNull)
+  status                CurfewAlertStatus @default(OPEN)
+  resolved_by           String?
+  resolver              User?             @relation("UserResolvedCurfewAlerts", fields: [resolved_by], references: [id], onDelete: SetNull)
+  resolved_at           DateTime?
+  resolution_note       String?           @db.Text
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+
+  @@index([hostel_id, status])
+  @@index([student_id, status])
+  @@index([triggered_at])
+  @@map("curfew_alerts")
+}
+
+// Advisory-only presence signals from simulated WiFi controller/RADIUS events.
+// NEVER used to drive alerts, student state changes, or occupancy counts.
+model DevicePresenceSignal {
+  id         String                  @id @default(uuid())
+  student_id String
+  student    Student                 @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  event_type DevicePresenceEventType
+  hostel_id  String
+  hostel     Hostel                  @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  timestamp  DateTime                @default(now())
+
+  @@index([student_id, timestamp])
+  @@index([hostel_id, timestamp])
+  @@map("device_presence_signals")
+}
+

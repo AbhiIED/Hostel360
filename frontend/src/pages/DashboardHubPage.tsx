@@ -15,7 +15,10 @@ import {
   RefreshCw,
   TrendingUp,
   LayoutDashboard,
+  ShieldAlert,
 } from 'lucide-react';
+import CurfewAlertsPanel from '../components/CurfewAlertsPanel';
+import LeaveRequestsPanel from '../components/LeaveRequestsPanel';
 
 export const DashboardHubPage: React.FC = () => {
   const { user } = useAuth();
@@ -357,6 +360,9 @@ export const DashboardHubPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Module 3: Curfew Alerts Panel */}
+          <CurfewAlertsPanel hostelId={selectedHostelId || assignedHostel?.id} />
         </div>
       </div>
     );
@@ -406,6 +412,13 @@ export const DashboardHubPage: React.FC = () => {
             >
               <History className="w-4 h-4" strokeWidth={1.5} />
               <span>Audit history</span>
+            </Link>
+            <Link
+              to="/dashboard/curfew"
+              className="flex items-center gap-2.5 px-3 py-2 rounded text-xs text-[#5B6472] hover:text-[#1C2430] hover:bg-white transition"
+            >
+              <ShieldAlert className="w-4 h-4" strokeWidth={1.5} />
+              <span>Curfew & rules</span>
             </Link>
             <Link
               to="/dashboard/analytics"
@@ -606,6 +619,12 @@ export const DashboardHubPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Curfew Alerts Panel */}
+            <CurfewAlertsPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+            {/* Leave Requests (Out-Pass) Panel */}
+            <LeaveRequestsPanel hostelId={selectedHostelId || assignedHostel?.id} />
           </main>
         </div>
       </div>
@@ -660,6 +679,13 @@ export const DashboardHubPage: React.FC = () => {
             >
               <Laptop className="w-4 h-4" strokeWidth={1.5} />
               <span>Hardware kiosks</span>
+            </Link>
+            <Link
+              to="/dashboard/curfew"
+              className="flex items-center gap-2.5 px-3 py-2 rounded text-xs text-[#5B6472] hover:text-[#1C2430] hover:bg-white transition"
+            >
+              <ShieldAlert className="w-4 h-4" strokeWidth={1.5} />
+              <span>Curfew & rules</span>
             </Link>
             <Link
               to="/dashboard/history"
@@ -882,6 +908,10 @@ export const DashboardHubPage: React.FC = () => {
                   </table>
                 </div>
               </div>
+
+              {/* Curfew Alerts & Out-Pass Monitoring */}
+              <CurfewAlertsPanel showAllHostels={true} />
+              <LeaveRequestsPanel showAllHostels={true} />
             </div>
           </main>
         </div>

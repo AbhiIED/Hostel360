@@ -1,5 +1,6 @@
 import prisma from '../prisma.js';
 import { validateAndConsume } from '../services/qrTokenService.js';
+import { isStudentInCurfew, getCoveringApprovedLeave } from '../services/curfewService.js';
 
 /**
  * 6.1 & 6.2 POST /api/attendance/scan
@@ -81,8 +82,10 @@ export async function scanAttendance(req, res) {
       const currentDirection = student.current_state === 'INSIDE' ? 'EXIT' : 'ENTRY';
       const nextState = currentDirection === 'EXIT' ? 'OUTSIDE' : 'INSIDE';
 
-      // Atomic database transaction: create attendance, update student current_state, create audit log
-      const { attendance, updatedStudent } = await prisma.$transaction(async (tx) => {
+      // Atomic database transaction: create attendance, update student current_state, check curfew, create audit log
+      const { attendance, updatedStudent, curfewAlert } = await prisma.$transaction(async (tx) => {
+        const scanTimestamp = new Date();
+
         const attendanceRecord = await tx.hostelAttendance.create({
           data: {
             student_id: student.id,
@@ -90,6 +93,7 @@ export async function scanAttendance(req, res) {
             gate_id: qrToken.gate_id,
             device_id: qrToken.device_id,
             direction: currentDirection,
+            scanned_at: scanTimestamp,
             qr_token_id: qrToken.id,
           },
           include: {
@@ -98,12 +102,45 @@ export async function scanAttendance(req, res) {
           },
         });
 
+        // 12.1 Persist state_since atomically with current_state
         const studentUpdated = await tx.student.update({
           where: { id: student.id },
           data: {
             current_state: nextState,
+            state_since: scanTimestamp,
           },
         });
+
+        // 12.3 Job B: Real-Time Scan Validation (Exit During Curfew)
+        let raisedCurfewAlert = null;
+        if (currentDirection === 'EXIT') {
+          const { inCurfew } = await isStudentInCurfew(student.hostel_id, scanTimestamp, tx);
+          if (inCurfew) {
+            const coveringLeave = await getCoveringApprovedLeave(student.id, scanTimestamp, tx);
+            if (!coveringLeave) {
+              // Unauthorized exit during curfew: immediately raise EXIT_DURING_CURFEW alert
+              raisedCurfewAlert = await tx.curfewAlert.create({
+                data: {
+                  student_id: student.id,
+                  hostel_id: student.hostel_id,
+                  alert_type: 'EXIT_DURING_CURFEW',
+                  triggered_at: scanTimestamp,
+                  related_attendance_id: attendanceRecord.id,
+                  status: 'OPEN',
+                },
+                include: {
+                  student: {
+                    include: {
+                      user: { select: { id: true, name: true, email: true } },
+                      room: { select: { id: true, room_number: true, floor: true, block: true } },
+                    },
+                  },
+                  hostel: { select: { id: true, name: true, code: true } },
+                },
+              });
+            }
+          }
+        }
 
         // 6.6 Scan audit log
         await tx.auditLog.create({
@@ -123,11 +160,12 @@ export async function scanAttendance(req, res) {
               gateName: qrToken.gate.name,
               hostelId: qrToken.gate.hostel_id,
               deviceId: qrToken.device_id,
+              curfewAlertRaised: raisedCurfewAlert ? raisedCurfewAlert.id : null,
             },
           },
         });
 
-        return { attendance: attendanceRecord, updatedStudent: studentUpdated };
+        return { attendance: attendanceRecord, updatedStudent: studentUpdated, curfewAlert: raisedCurfewAlert };
       });
 
       // 6.4 & 6.5 Socket.IO event emission
@@ -179,6 +217,13 @@ export async function scanAttendance(req, res) {
           direction: currentDirection,
           scannedAt: attendance.scanned_at,
         });
+
+        // 12.3 Real-time Socket.IO alert for Job B EXIT_DURING_CURFEW
+        if (curfewAlert) {
+          io.to(`hostel:${qrToken.gate.hostel_id}`).emit('curfew:alert', curfewAlert);
+          io.to('admin:feed').emit('curfew:alert', curfewAlert);
+          io.to('admin:curfew').emit('curfew:alert', curfewAlert);
+        }
       }
 
       return res.status(200).json({

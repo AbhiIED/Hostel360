@@ -24,6 +24,7 @@ import { StudentAppPage } from './pages/StudentAppPage';
 import { DashboardHubPage } from './pages/DashboardHubPage';
 import { AttendanceHistoryPage } from './pages/AttendanceHistoryPage';
 import { AnalyticsReportsPage } from './pages/AnalyticsReportsPage';
+import { CurfewManagementPage } from './pages/CurfewManagementPage';
 
 const HomeView = () => {
   const { user, isAuthenticated } = useAuth();
@@ -244,6 +245,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
                     <DeviceManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/curfew"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARDEN', 'VICE_WARDEN', 'CARETAKER']}>
+                    <CurfewManagementPage />
                   </ProtectedRoute>
                 }
               />

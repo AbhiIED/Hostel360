@@ -23,6 +23,8 @@ import {
   Edit2,
   ShieldAlert,
   ShieldCheck,
+  ArrowLeftRight,
+  Shuffle,
 } from 'lucide-react';
 
 interface StudentProfile {
@@ -75,7 +77,7 @@ interface MessAttendanceLog {
 }
 
 export const StudentAppPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'mess' | 'leave'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'mess' | 'leave' | 'allocation'>('scan');
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [hostelLogs, setHostelLogs] = useState<HostelAttendanceLog[]>([]);
   const [messLogs, setMessLogs] = useState<MessAttendanceLog[]>([]);
@@ -95,6 +97,31 @@ export const StudentAppPage: React.FC = () => {
   const [editingLeave, setEditingLeave] = useState<any | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Allocation & Swaps State (Phase 14)
+  const [openWindows, setOpenWindows] = useState<any[]>([]);
+  const [hostelList, setHostelList] = useState<any[]>([]);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [mySwaps, setMySwaps] = useState<any[]>([]);
+  const [allocLoading, setAllocLoading] = useState<boolean>(false);
+  const [allocSubmitting, setAllocSubmitting] = useState<boolean>(false);
+  const [allocError, setAllocError] = useState<string | null>(null);
+  const [allocSuccess, setAllocSuccess] = useState<string | null>(null);
+
+  const [appForm, setAppForm] = useState({
+    window_id: '',
+    hostel_id: '',
+    year_of_study: 1,
+    accessibility_needs: false,
+    accessibility_notes: '',
+    documents_url: '',
+  });
+
+  const [swapTargetRoll, setSwapTargetRoll] = useState('');
+  const [swapNote, setSwapNote] = useState('');
+  const [swapSubmitting, setSwapSubmitting] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [swapSuccess, setSwapSuccess] = useState<string | null>(null);
 
   // Scanner State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
@@ -159,7 +186,103 @@ export const StudentAppPage: React.FC = () => {
 
   useEffect(() => {
     fetchStudentData();
+    fetchAllocationData();
   }, [fetchStudentData]);
+
+  const fetchAllocationData = useCallback(async () => {
+    try {
+      setAllocLoading(true);
+      const [winRes, hostRes, myAppRes] = await Promise.all([
+        api.get('/allocations/windows?status=OPEN'),
+        api.get('/hostels'),
+        api.get('/allocations/applications/my'),
+      ]);
+      const wins = winRes.data.windows || [];
+      setOpenWindows(wins);
+      setHostelList(hostRes.data.hostels || []);
+      setMyApplications(myAppRes.data.applications || []);
+      setMySwaps(myAppRes.data.swap_requests || []);
+      if (wins.length > 0) {
+        setAppForm((prev) => ({
+          ...prev,
+          window_id: prev.window_id || wins[0].id,
+          hostel_id: prev.hostel_id || wins[0].hostel_id || '',
+        }));
+      }
+    } catch (err: any) {
+      console.error('Error fetching allocation data:', err);
+    } finally {
+      setAllocLoading(false);
+    }
+  }, []);
+
+  const handleApplyHostel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setAllocSubmitting(true);
+      setAllocError(null);
+      setAllocSuccess(null);
+
+      const res = await api.post('/allocations/applications', {
+        window_id: appForm.window_id,
+        hostel_id: appForm.hostel_id,
+        year_of_study: parseInt(appForm.year_of_study.toString(), 10),
+        accessibility_needs: appForm.accessibility_needs,
+        accessibility_notes: appForm.accessibility_needs ? appForm.accessibility_notes : undefined,
+        documents_url: appForm.documents_url || undefined,
+      });
+
+      setAllocSuccess(res.data.message || 'Application submitted successfully.');
+      fetchAllocationData();
+    } catch (err: any) {
+      setAllocError(err.response?.data?.error || 'Failed to submit application.');
+    } finally {
+      setAllocSubmitting(false);
+    }
+  };
+
+  const handleRequestSwap = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!swapTargetRoll.trim()) {
+      setSwapError('Please enter peer student roll number.');
+      return;
+    }
+    try {
+      setSwapSubmitting(true);
+      setSwapError(null);
+      setSwapSuccess(null);
+
+      const res = await api.post('/allocations/swaps', {
+        target_roll_number: swapTargetRoll.trim(),
+        note: swapNote || undefined,
+      });
+
+      setSwapSuccess(res.data.message || 'Room swap request sent to peer.');
+      setSwapTargetRoll('');
+      setSwapNote('');
+      fetchAllocationData();
+    } catch (err: any) {
+      setSwapError(err.response?.data?.error || 'Failed to submit room swap request.');
+    } finally {
+      setSwapSubmitting(false);
+    }
+  };
+
+  const handleAcceptPeerSwap = async (swapId: string) => {
+    try {
+      setSwapSubmitting(true);
+      setSwapError(null);
+      setSwapSuccess(null);
+
+      const res = await api.patch(`/allocations/swaps/${swapId}/peer-accept`);
+      setSwapSuccess(res.data.message || 'Swap request accepted!');
+      fetchAllocationData();
+    } catch (err: any) {
+      setSwapError(err.response?.data?.error || 'Failed to accept swap request.');
+    } finally {
+      setSwapSubmitting(false);
+    }
+  };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -581,6 +704,21 @@ export const StudentAppPage: React.FC = () => {
         >
           <FileText className="w-3.5 h-3.5" />
           <span>Out-pass / Leave ({leaveRequests.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('allocation');
+            fetchAllocationData();
+          }}
+          className={`flex items-center gap-1.5 pb-2 -mb-2.5 transition whitespace-nowrap ${
+            activeTab === 'allocation'
+              ? 'text-[#1C2430] font-medium border-b-2 border-[#26415C]'
+              : 'text-[#5B6472] hover:text-[#1C2430]'
+          }`}
+        >
+          <Building className="w-3.5 h-3.5" />
+          <span>Room Allocation & Swaps</span>
         </button>
       </div>
 
@@ -1206,6 +1344,411 @@ export const StudentAppPage: React.FC = () => {
                   </div>
                 </form>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 5. Tab 5: Batch Room Allocation & Mutual Room Swaps (Phase 14) */}
+      {activeTab === 'allocation' && (
+        <div className="space-y-6">
+          {/* Informational Architecture Banner */}
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4 text-xs text-[#334155] space-y-1.5">
+            <div className="flex items-center gap-2 font-semibold text-[#1E293B]">
+              <Shuffle className="w-4 h-4 text-[#26415C]" />
+              <span>Continuous Batch Room Allocation Model</span>
+            </div>
+            <p>
+              Students apply to a <strong>Hostel</strong> rather than racing to claim individual rooms. A deterministic,
+              seeded batch job allocates rooms after the registration window closes based on floor-year mapping policy
+              and accessibility requirements.
+            </p>
+          </div>
+
+          {allocLoading && (
+            <div className="flex items-center gap-2 text-xs text-[#5B6472] p-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#26415C]" />
+              <span>Loading allocation status and open windows...</span>
+            </div>
+          )}
+
+          {/* Alert Messages */}
+          {allocError && (
+            <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded text-xs text-[#991B1B] flex items-center justify-between">
+              <span>{allocError}</span>
+              <button onClick={() => setAllocError(null)} className="font-semibold underline text-[11px]">
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {allocSuccess && (
+            <div className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded text-xs text-[#166534] flex items-center justify-between">
+              <span>{allocSuccess}</span>
+              <button onClick={() => setAllocSuccess(null)} className="font-semibold underline text-[11px]">
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Section 1: Active Applications Status */}
+          {myApplications.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-[#1C2430]">Your Hostel Applications</h3>
+              {myApplications.map((appItem) => {
+                const alloc = appItem.room_allocation;
+                const isRedirected = Boolean(appItem.redirect_from_hostel_id);
+
+                return (
+                  <div
+                    key={appItem.id}
+                    className="bg-white border border-[#E4E1DA] rounded-lg p-5 shadow-sm space-y-3 text-xs"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E4E1DA]">
+                      <div>
+                        <span className="text-[11px] text-[#5B6472] block">
+                          Academic Session: {appItem.window?.academic_year || 'Current'}
+                        </span>
+                        <span className="font-semibold text-sm text-[#1C2430]">
+                          Applied Hostel: {appItem.hostel?.name} ({appItem.hostel?.code})
+                        </span>
+                      </div>
+
+                      <div>
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${
+                            appItem.status === 'ALLOCATED'
+                              ? 'bg-[#2E7D5B] text-white'
+                              : appItem.status === 'FLAGGED'
+                              ? 'bg-[#FEF08A] text-[#854D0E]'
+                              : appItem.status === 'ESCALATED'
+                              ? 'bg-[#F3E8FF] text-[#6B21A8]'
+                              : 'bg-[#E0F2FE] text-[#0369A1]'
+                          }`}
+                        >
+                          Status: {appItem.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Redirect Alert Banner */}
+                    {isRedirected && (
+                      <div className="p-3 bg-[#FFF7ED] border border-[#FED7AA] rounded text-[#C2410C]">
+                        <span className="font-semibold block mb-0.5">Campus Redirect Notice:</span>
+                        <span>{appItem.redirect_reason}</span>
+                      </div>
+                    )}
+
+                    {/* Zero-Vacancy Escalated Banner */}
+                    {appItem.status === 'ESCALATED' && (
+                      <div className="p-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded text-[#6B21A8]">
+                        <span className="font-semibold block mb-0.5">Super Admin Queue:</span>
+                        <span>{appItem.flag_reason || 'Zero vacancy campus-wide. Awaiting manual placement.'}</span>
+                      </div>
+                    )}
+
+                    {/* Room Allocation Info */}
+                    {alloc ? (
+                      <div className="bg-[#FBFBFA] p-3 rounded border border-[#E4E1DA] grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <span className="text-[11px] text-[#5B6472] block">Assigned Room</span>
+                          <span className="font-semibold text-sm text-[#1C2430]">
+                            Room {alloc.room?.room_number || 'N/A'} (Floor {alloc.assigned_floor})
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-[#5B6472] block">Hostel Placement</span>
+                          <span className="font-semibold text-sm text-[#1C2430]">{alloc.hostel?.name}</span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-[#5B6472] block">Allocation Verification</span>
+                          <span
+                            className={`font-semibold text-xs ${
+                              alloc.status === 'CONFIRMED' ? 'text-[#2E7D5B]' : 'text-[#854D0E]'
+                            }`}
+                          >
+                            {alloc.status === 'CONFIRMED'
+                              ? 'CONFIRMED (Gate QR Active)'
+                              : 'PROPOSED (Awaiting Caretaker Review)'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-[#5B6472] italic">
+                        {appItem.status === 'PENDING'
+                          ? 'Application registered. Awaiting window closure and batch lottery draw.'
+                          : 'Allocation processing.'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Section 2: Hostel Application Form (when windows are open and user has not applied) */}
+          {openWindows.length > 0 && myApplications.length === 0 && (
+            <div className="bg-white border border-[#E4E1DA] rounded-lg p-5 shadow-sm space-y-4">
+              <div className="pb-3 border-b border-[#E4E1DA]">
+                <h3 className="text-sm font-semibold text-[#1C2430]">Apply for Hostel Accommodation</h3>
+                <p className="text-xs text-[#5B6472] mt-0.5">
+                  Registration window is currently open. Select your preferred hostel and details below.
+                </p>
+              </div>
+
+              <form onSubmit={handleApplyHostel} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Registration Window
+                    </label>
+                    <select
+                      value={appForm.window_id}
+                      onChange={(e) => setAppForm({ ...appForm, window_id: e.target.value })}
+                      required
+                      className="w-full p-2.5 border border-[#E4E1DA] rounded bg-white text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    >
+                      {openWindows.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          Session {w.academic_year} (Open until {new Date(w.open_to).toLocaleDateString()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Preferred Hostel Choice
+                    </label>
+                    <select
+                      value={appForm.hostel_id}
+                      onChange={(e) => setAppForm({ ...appForm, hostel_id: e.target.value })}
+                      required
+                      className="w-full p-2.5 border border-[#E4E1DA] rounded bg-white text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    >
+                      <option value="">-- Choose Hostel --</option>
+                      {hostelList
+                        .filter((h) => {
+                          if (profile?.gender === 'MALE') return h.type === 'BOYS';
+                          if (profile?.gender === 'FEMALE') return h.type === 'GIRLS';
+                          return true;
+                        })
+                        .map((h) => (
+                          <option key={h.id} value={h.id}>
+                            {h.name} ({h.code}) — {h.type}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Year of Study
+                    </label>
+                    <select
+                      value={appForm.year_of_study}
+                      onChange={(e) =>
+                        setAppForm({ ...appForm, year_of_study: parseInt(e.target.value, 10) })
+                      }
+                      className="w-full p-2.5 border border-[#E4E1DA] rounded bg-white text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    >
+                      <option value={1}>1st Year (Floor 1 mapped)</option>
+                      <option value={2}>2nd Year (Floor 2 mapped)</option>
+                      <option value={3}>3rd Year (Floor 3 mapped)</option>
+                      <option value={4}>4th Year (Floor 4 mapped)</option>
+                      <option value={5}>5th Year (Floor 5 mapped)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Verification Documents URL / Reference
+                    </label>
+                    <input
+                      type="text"
+                      value={appForm.documents_url}
+                      onChange={(e) => setAppForm({ ...appForm, documents_url: e.target.value })}
+                      placeholder="e.g. Admission letter link or registration ID"
+                      className="w-full p-2.5 border border-[#E4E1DA] rounded text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    />
+                  </div>
+                </div>
+
+                {/* Accessibility Accommodation Toggle */}
+                <div className="p-3 bg-[#FBFBFA] border border-[#E4E1DA] rounded space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={appForm.accessibility_needs}
+                      onChange={(e) => setAppForm({ ...appForm, accessibility_needs: e.target.checked })}
+                      className="rounded text-[#26415C]"
+                    />
+                    <span className="font-medium text-[#1C2430]">
+                      I require special accessibility accommodation (Ground floor / Wheelchair accessible room)
+                    </span>
+                  </label>
+
+                  {appForm.accessibility_needs && (
+                    <textarea
+                      value={appForm.accessibility_notes}
+                      onChange={(e) => setAppForm({ ...appForm, accessibility_notes: e.target.value })}
+                      placeholder="Please describe your specific accommodation needs for the accessibility pre-pass..."
+                      className="w-full text-xs p-2 border border-[#D5D2CA] rounded focus:outline-none focus:border-[#26415C]"
+                      rows={2}
+                    />
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={allocSubmitting}
+                    className="px-5 py-2 bg-[#26415C] hover:bg-[#1B2E42] text-white rounded font-medium transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{allocSubmitting ? 'Submitting Application...' : 'Submit Application'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Section 3: Room Swap Requests (Post-Allocation) */}
+          {profile?.room && (
+            <div className="bg-white border border-[#E4E1DA] rounded-lg p-5 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E4E1DA]">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#1C2430]">Mutual Room Swap Portal</h3>
+                  <p className="text-xs text-[#5B6472] mt-0.5">
+                    Your current room: <strong>Room {profile.room.room_number}</strong> ({profile.hostel?.name}).
+                    Both students must mutually accept before staff approval.
+                  </p>
+                </div>
+              </div>
+
+              {/* Swap Alerts */}
+              {swapError && (
+                <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded text-xs text-[#991B1B] flex items-center justify-between">
+                  <span>{swapError}</span>
+                  <button onClick={() => setSwapError(null)} className="font-semibold underline text-[11px]">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {swapSuccess && (
+                <div className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded text-xs text-[#166534] flex items-center justify-between">
+                  <span>{swapSuccess}</span>
+                  <button onClick={() => setSwapSuccess(null)} className="font-semibold underline text-[11px]">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Request Swap Form */}
+              <form onSubmit={handleRequestSwap} className="p-3 bg-[#FBFBFA] border border-[#E4E1DA] rounded space-y-3 text-xs">
+                <span className="font-semibold text-[#1C2430] block">Request Room Swap with a Student</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Peer Student Roll Number
+                    </label>
+                    <input
+                      type="text"
+                      value={swapTargetRoll}
+                      onChange={(e) => setSwapTargetRoll(e.target.value)}
+                      placeholder="e.g. 211112042"
+                      required
+                      className="w-full p-2 border border-[#D5D2CA] rounded text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#5B6472] mb-1">
+                      Optional Note / Reason
+                    </label>
+                    <input
+                      type="text"
+                      value={swapNote}
+                      onChange={(e) => setSwapNote(e.target.value)}
+                      placeholder="e.g. Swapping to study together"
+                      className="w-full p-2 border border-[#D5D2CA] rounded text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={swapSubmitting}
+                    className="px-4 py-1.5 bg-[#26415C] hover:bg-[#1B2E42] text-white rounded font-medium transition shadow-sm disabled:opacity-50 flex items-center gap-1.5 text-xs"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Send Swap Request</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Swaps List */}
+              {mySwaps.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <span className="text-xs font-semibold text-[#1C2430] block">Your Swap History</span>
+                  <div className="divide-y divide-[#E4E1DA] border border-[#E4E1DA] rounded">
+                    {mySwaps.map((sw) => {
+                      const isIncoming = sw.target_student_id === profile.id;
+                      const canAccept = isIncoming && sw.status === 'PENDING_PEER_ACCEPTANCE';
+
+                      return (
+                        <div key={sw.id} className="p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <div className="font-semibold text-[#1C2430]">
+                              {isIncoming ? (
+                                <span>Incoming swap request from {sw.sender_student?.user?.name} (Room {sw.sender_room?.room_number})</span>
+                              ) : (
+                                <span>Outgoing swap request to {sw.target_student?.user?.name} (Room {sw.target_room?.room_number})</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#5B6472] mt-0.5">
+                              {sw.is_cross_tier && (
+                                <span className="text-[#B91C1C] font-medium mr-2">Cross-Tier Swap (Warden Review)</span>
+                              )}
+                              <span>Requested: {new Date(sw.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                sw.status === 'APPROVED'
+                                  ? 'bg-[#2E7D5B] text-white'
+                                  : sw.status === 'REJECTED'
+                                  ? 'bg-[#FECACA] text-[#991B1B]'
+                                  : sw.status === 'ESCALATED_TO_WARDEN'
+                                  ? 'bg-[#F3E8FF] text-[#6B21A8]'
+                                  : 'bg-[#FEF08A] text-[#854D0E]'
+                              }`}
+                            >
+                              {sw.status.replace(/_/g, ' ')}
+                            </span>
+
+                            {canAccept && (
+                              <button
+                                onClick={() => handleAcceptPeerSwap(sw.id)}
+                                disabled={swapSubmitting}
+                                className="px-3 py-1 bg-[#2E7D5B] hover:bg-[#25664A] text-white rounded text-xs font-medium transition shadow-sm"
+                              >
+                                Accept Swap
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

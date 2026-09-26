@@ -13,7 +13,7 @@ const createStudentSchema = z.object({
   department: z.string().max(50).optional().nullable(),
   year: z.number().int().min(1).max(6).optional().nullable(),
   hostel_id: z.string().uuid(),
-  room_id: z.string().uuid(),
+  room_id: z.string().uuid().optional().nullable(),
   photo_url: z.string().url().max(512).optional().nullable(),
 });
 
@@ -114,16 +114,18 @@ export async function createStudent(req, res) {
       return res.status(400).json({ error: 'Invalid hostel_id: hostel not found' });
     }
 
-    // Validate room exists and belongs to the hostel
-    const room = await prisma.room.findUnique({ where: { id: room_id } });
-    if (!room || room.hostel_id !== hostel_id) {
-      return res.status(400).json({ error: 'Invalid room_id: room not found or does not belong to the specified hostel' });
-    }
+    // Validate room exists and belongs to the hostel if room_id is provided
+    if (room_id) {
+      const room = await prisma.room.findUnique({ where: { id: room_id } });
+      if (!room || room.hostel_id !== hostel_id) {
+        return res.status(400).json({ error: 'Invalid room_id: room not found or does not belong to the specified hostel' });
+      }
 
-    // Check room capacity
-    const currentOccupants = await prisma.student.count({ where: { room_id } });
-    if (currentOccupants >= room.capacity) {
-      return res.status(409).json({ error: `Room ${room.room_number} is at full capacity (${room.capacity})` });
+      // Check room capacity
+      const currentOccupants = await prisma.student.count({ where: { room_id } });
+      if (currentOccupants >= room.capacity) {
+        return res.status(409).json({ error: `Room ${room.room_number} is at full capacity (${room.capacity})` });
+      }
     }
 
     // Hash password

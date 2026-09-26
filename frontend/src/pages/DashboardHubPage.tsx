@@ -21,6 +21,8 @@ import {
 import CurfewAlertsPanel from '../components/CurfewAlertsPanel';
 import LeaveRequestsPanel from '../components/LeaveRequestsPanel';
 import MyKiosksPanel from '../components/MyKiosksPanel';
+import AllocationReviewPanel from '../components/AllocationReviewPanel';
+import RoomSwapPanel from '../components/RoomSwapPanel';
 
 export const DashboardHubPage: React.FC = () => {
   const { user } = useAuth();
@@ -387,6 +389,12 @@ export const DashboardHubPage: React.FC = () => {
 
           {/* Module 5: Leave Requests (Tiered Approvals) */}
           <LeaveRequestsPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+          {/* Module 6: Batch Room Allocation Review */}
+          <AllocationReviewPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+          {/* Module 7: Mutual Room Swap Requests */}
+          <RoomSwapPanel hostelId={selectedHostelId || assignedHostel?.id} />
         </div>
       </div>
     );
@@ -649,6 +657,12 @@ export const DashboardHubPage: React.FC = () => {
 
             {/* Leave Requests (Out-Pass) Panel */}
             <LeaveRequestsPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+            {/* Batch Room Allocation Review (Escalated & Flagged Cases) */}
+            <AllocationReviewPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+            {/* Mutual Room Swap Requests (Cross-Tier Exceptions) */}
+            <RoomSwapPanel hostelId={selectedHostelId || assignedHostel?.id} />
           </main>
         </div>
       </div>
@@ -936,6 +950,12 @@ export const DashboardHubPage: React.FC = () => {
               {/* Curfew Alerts & Out-Pass Monitoring */}
               <CurfewAlertsPanel showAllHostels={true} />
               <LeaveRequestsPanel showAllHostels={true} />
+
+              {/* Batch Room Allocation Review */}
+              <AllocationReviewPanel />
+
+              {/* Mutual Room Swap Requests */}
+              <RoomSwapPanel />
             </div>
           </main>
         </div>

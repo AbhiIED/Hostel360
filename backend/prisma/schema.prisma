@@ -102,6 +102,52 @@ enum RiskTier {
   HIGH
 }
 
+enum WindowStatus {
+  UPCOMING
+  OPEN
+  CLOSED
+  PROCESSED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ALLOCATED
+  FLAGGED
+  ESCALATED
+  CANCELLED
+}
+
+enum BatchStatus {
+  COMPLETED
+  CONFIRMED
+  CANCELLED
+}
+
+enum CascadeStep {
+  TARGET_FLOOR
+  ADJACENT_FLOOR
+  ANY_FLOOR
+  REDIRECTED_HOSTEL
+  ACCESSIBILITY_PREPASS
+}
+
+enum AllocationStatus {
+  PROPOSED
+  CONFIRMED
+  FLAGGED
+  REJECTED
+  CANCELLED
+}
+
+enum SwapStatus {
+  PENDING_PEER_ACCEPTANCE
+  PEER_ACCEPTED
+  ESCALATED_TO_WARDEN
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id            String         @id @default(uuid())
   name          String         @db.VarChar(120)
@@ -112,15 +158,19 @@ model User {
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 
-  student                  Student?
-  staff_hostel_assignments StaffHostelAssignment[]
-  staff_mess_assignments   StaffMessAssignment[]
-  registered_devices       Device[]                @relation("UserRegisteredDevices")
-  refresh_tokens           RefreshToken[]
-  updated_curfew_windows   CurfewWindow[]          @relation("UserUpdatedCurfewWindows")
-  decided_leave_requests   LeaveRequest[]          @relation("UserDecidedLeaveRequests")
-  verified_leave_requests  LeaveRequest[]          @relation("UserVerifiedLeaveRequests")
-  resolved_curfew_alerts   CurfewAlert[]           @relation("UserResolvedCurfewAlerts")
+  student                      Student?
+  staff_hostel_assignments     StaffHostelAssignment[]
+  staff_mess_assignments       StaffMessAssignment[]
+  registered_devices           Device[]                @relation("UserRegisteredDevices")
+  refresh_tokens               RefreshToken[]
+  updated_curfew_windows       CurfewWindow[]          @relation("UserUpdatedCurfewWindows")
+  decided_leave_requests       LeaveRequest[]          @relation("UserDecidedLeaveRequests")
+  verified_leave_requests      LeaveRequest[]          @relation("UserVerifiedLeaveRequests")
+  resolved_curfew_alerts       CurfewAlert[]           @relation("UserResolvedCurfewAlerts")
+  created_registration_windows RegistrationWindow[]    @relation("WindowCreator")
+  executed_allocation_batches  AllocationBatch[]       @relation("BatchExecutor")
+  confirmed_allocations        RoomAllocation[]        @relation("AllocationConfirmer")
+  decided_swaps                RoomSwapRequest[]       @relation("SwapDecider")
 
   @@map("users")
 }
@@ -135,8 +185,8 @@ model Student {
   year          Int?
   hostel_id     String
   hostel        Hostel       @relation(fields: [hostel_id], references: [id])
-  room_id       String
-  room          Room         @relation(fields: [room_id], references: [id])
+  room_id       String?
+  room          Room?        @relation(fields: [room_id], references: [id], onDelete: SetNull)
   photo_url     String?      @db.VarChar(512)
   current_state StudentState @default(INSIDE)
   state_since   DateTime     @default(now())
@@ -148,6 +198,10 @@ model Student {
   leave_requests          LeaveRequest[]
   curfew_alerts           CurfewAlert[]
   device_presence_signals DevicePresenceSignal[]
+  hostel_applications     HostelApplication[]
+  room_allocations        RoomAllocation[]
+  swap_requests_sent      RoomSwapRequest[]      @relation("SwapSenderStudent")
+  swap_requests_received  RoomSwapRequest[]      @relation("SwapTargetStudent")
 
   @@map("students")
 }
@@ -173,22 +227,32 @@ model Hostel {
   leave_requests           LeaveRequest[]
   curfew_alerts            CurfewAlert[]
   device_presence_signals  DevicePresenceSignal[]
+  registration_windows     RegistrationWindow[]
+  floor_year_mappings      FloorYearMapping[]
+  hostel_applications      HostelApplication[]    @relation("AppliedHostel")
+  redirected_applications  HostelApplication[]    @relation("RedirectedApplications")
+  allocation_batches       AllocationBatch[]
+  room_allocations         RoomAllocation[]
 
   @@map("hostels")
 }
 
 model Room {
-  id          String     @id @default(uuid())
-  hostel_id   String
-  hostel      Hostel     @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
-  block       String?    @db.VarChar(2)
-  floor       Int        @default(0)
-  room_number String     @db.VarChar(10)
-  capacity    Int        @default(2)
-  status      RoomStatus @default(ACTIVE)
-  created_at  DateTime   @default(now())
+  id            String     @id @default(uuid())
+  hostel_id     String
+  hostel        Hostel     @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  block         String?    @db.VarChar(2)
+  floor         Int        @default(0)
+  room_number   String     @db.VarChar(10)
+  capacity      Int        @default(2)
+  is_accessible Boolean    @default(false)
+  status        RoomStatus @default(ACTIVE)
+  created_at    DateTime   @default(now())
 
-  students Student[]
+  students           Student[]
+  room_allocations   RoomAllocation[]
+  swap_requests_from RoomSwapRequest[] @relation("SwapSenderRoom")
+  swap_requests_to   RoomSwapRequest[] @relation("SwapTargetRoom")
 
   @@unique([hostel_id, block, room_number])
   @@map("rooms")
@@ -481,5 +545,149 @@ model DevicePresenceSignal {
   @@index([student_id, timestamp])
   @@index([hostel_id, timestamp])
   @@map("device_presence_signals")
+}
+
+// -------------------------------------------------------------
+// BATCH ROOM ALLOCATION & SWAP MODELS (Phase 14)
+// -------------------------------------------------------------
+
+model RegistrationWindow {
+  id            String       @id @default(uuid())
+  academic_year String       @db.VarChar(20)
+  semester      Int          @default(1)
+  hostel_id     String?
+  hostel        Hostel?      @relation(fields: [hostel_id], references: [id], onDelete: SetNull)
+  open_from     DateTime
+  open_to       DateTime
+  status        WindowStatus @default(UPCOMING)
+  created_by    String?
+  creator       User?        @relation("WindowCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  applications       HostelApplication[]
+  allocation_batches AllocationBatch[]
+
+  @@index([status, open_from, open_to])
+  @@map("registration_windows")
+}
+
+model FloorYearMapping {
+  id            String   @id @default(uuid())
+  hostel_id     String
+  hostel        Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  floor         Int
+  year_of_study Int
+  capacity      Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([hostel_id, floor, year_of_study])
+  @@map("floor_year_mapping")
+}
+
+model HostelApplication {
+  id                      String             @id @default(uuid())
+  window_id               String
+  window                  RegistrationWindow @relation(fields: [window_id], references: [id], onDelete: Cascade)
+  student_id              String
+  student                 Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  hostel_id               String
+  hostel                  Hostel             @relation("AppliedHostel", fields: [hostel_id], references: [id], onDelete: Cascade)
+  year_of_study           Int
+  is_renewal              Boolean            @default(false)
+  accessibility_needs     Boolean            @default(false)
+  accessibility_details   String?            @db.Text
+  document_urls           Json?
+  status                  ApplicationStatus  @default(PENDING)
+  flag_reason             String?            @db.Text
+  redirect_from_hostel_id String?
+  redirect_from_hostel    Hostel?            @relation("RedirectedApplications", fields: [redirect_from_hostel_id], references: [id], onDelete: SetNull)
+  redirect_reason         String?            @db.Text
+  created_at              DateTime           @default(now())
+  updated_at              DateTime           @updatedAt
+
+  room_allocation RoomAllocation?
+
+  @@unique([window_id, student_id])
+  @@index([hostel_id, status])
+  @@map("hostel_applications")
+}
+
+model AllocationBatch {
+  id               String             @id @default(uuid())
+  window_id        String
+  window           RegistrationWindow @relation(fields: [window_id], references: [id], onDelete: Cascade)
+  hostel_id        String
+  hostel           Hostel             @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  lottery_seed     String             @db.VarChar(64)
+  total_applicants Int                @default(0)
+  allocated_count  Int                @default(0)
+  overflow_count   Int                @default(0)
+  redirect_count   Int                @default(0)
+  escalated_count  Int                @default(0)
+  status           BatchStatus        @default(COMPLETED)
+  executed_by      String?
+  executor         User?              @relation("BatchExecutor", fields: [executed_by], references: [id], onDelete: SetNull)
+  created_at       DateTime           @default(now())
+
+  allocations RoomAllocation[]
+
+  @@index([window_id, hostel_id])
+  @@map("allocation_batches")
+}
+
+model RoomAllocation {
+  id             String            @id @default(uuid())
+  batch_id       String
+  batch          AllocationBatch   @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  application_id String            @unique
+  application    HostelApplication @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  student_id     String
+  student        Student           @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  room_id        String
+  room           Room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  hostel_id      String
+  hostel         Hostel            @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  assigned_floor Int
+  cascade_step   CascadeStep       @default(TARGET_FLOOR)
+  status         AllocationStatus  @default(PROPOSED)
+  is_clean       Boolean           @default(true)
+  flag_reasons   Json?
+  confirmed_by   String?
+  confirmer      User?             @relation("AllocationConfirmer", fields: [confirmed_by], references: [id], onDelete: SetNull)
+  confirmed_at   DateTime?
+  review_notes   String?           @db.Text
+  created_at     DateTime          @default(now())
+  updated_at     DateTime          @updatedAt
+
+  @@index([batch_id, status])
+  @@index([hostel_id, status])
+  @@map("room_allocations")
+}
+
+model RoomSwapRequest {
+  id                String     @id @default(uuid())
+  sender_student_id String
+  sender_student    Student    @relation("SwapSenderStudent", fields: [sender_student_id], references: [id], onDelete: Cascade)
+  sender_room_id    String
+  sender_room       Room       @relation("SwapSenderRoom", fields: [sender_room_id], references: [id], onDelete: Cascade)
+  target_student_id String
+  target_student    Student    @relation("SwapTargetStudent", fields: [target_student_id], references: [id], onDelete: Cascade)
+  target_room_id    String
+  target_room       Room       @relation("SwapTargetRoom", fields: [target_room_id], references: [id], onDelete: Cascade)
+  status            SwapStatus @default(PENDING_PEER_ACCEPTANCE)
+  is_cross_tier     Boolean    @default(false)
+  peer_accepted_at  DateTime?
+  decided_by        String?
+  decider           User?      @relation("SwapDecider", fields: [decided_by], references: [id], onDelete: SetNull)
+  decided_at        DateTime?
+  decision_note     String?    @db.Text
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @updatedAt
+
+  @@index([sender_student_id, status])
+  @@index([target_student_id, status])
+  @@map("room_swap_requests")
 }
 

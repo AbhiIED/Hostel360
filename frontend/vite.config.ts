@@ -14,6 +14,15 @@ export default defineConfig({
       '/socket.io': {
         target: 'http://localhost:5000',
         ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err: any) => {
+            // Suppress benign connection aborts during page reloads or tab closures
+            if (['ECONNABORTED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+              return;
+            }
+            console.error('[vite ws proxy error]', err.message || err);
+          });
+        },
       },
     },
   },

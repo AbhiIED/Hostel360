@@ -14,7 +14,7 @@ import {
   Clock,
   Info,
 } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { getSocket } from '../api/socket';
 
 export interface LeaveRequest {
   id: string;
@@ -113,35 +113,47 @@ export const LeaveRequestsPanel: React.FC<LeaveRequestsPanelProps> = ({
 
   // Real-time socket updates
   useEffect(() => {
-    const socket = io('/', { transports: ['websocket', 'polling'] });
+    const socket = getSocket();
 
-    socket.on('connect', () => {
+    const joinRooms = () => {
       if (hostelId) {
         socket.emit('join', `hostel:${hostelId}`);
       }
       socket.emit('join', 'admin:feed');
-    });
+    };
 
-    socket.on('curfew:leave_request:new', (newReq: LeaveRequest) => {
+    if (socket.connected) {
+      joinRooms();
+    }
+    socket.on('connect', joinRooms);
+
+    const handleNewRequest = (newReq: LeaveRequest) => {
       if (showAllHostels || !hostelId || newReq.hostel_id === hostelId) {
         setRequests((prev) => [newReq, ...prev.filter((r) => r.id !== newReq.id)]);
       }
-    });
+    };
 
-    socket.on('curfew:leave_request:updated', (updated: LeaveRequest) => {
+    const handleUpdatedRequest = (updated: LeaveRequest) => {
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
       );
-    });
+    };
 
-    socket.on('curfew:leave_request:verified', (verified: LeaveRequest) => {
+    const handleVerifiedRequest = (verified: LeaveRequest) => {
       setRequests((prev) =>
         prev.map((r) => (r.id === verified.id ? { ...r, ...verified } : r))
       );
-    });
+    };
+
+    socket.on('curfew:leave_request:new', handleNewRequest);
+    socket.on('curfew:leave_request:updated', handleUpdatedRequest);
+    socket.on('curfew:leave_request:verified', handleVerifiedRequest);
 
     return () => {
-      socket.disconnect();
+      socket.off('connect', joinRooms);
+      socket.off('curfew:leave_request:new', handleNewRequest);
+      socket.off('curfew:leave_request:updated', handleUpdatedRequest);
+      socket.off('curfew:leave_request:verified', handleVerifiedRequest);
     };
   }, [hostelId, showAllHostels]);
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { io, Socket } from 'socket.io-client';
+import { getSocket } from '../api/socket';
+import type { Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -262,22 +263,26 @@ export const KioskDisplayPage: React.FC = () => {
   useEffect(() => {
     if (!deviceId) return;
 
-    const socket = io('/', {
-      transports: ['websocket', 'polling'],
-    });
+    const socket = getSocket();
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const handleConnect = () => {
       setIsSocketConnected(true);
       socket.emit('join', `device:${deviceId}`);
-    });
+    };
 
-    socket.on('disconnect', () => {
+    const handleDisconnect = () => {
       setIsSocketConnected(false);
-    });
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    }
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     // Anti-proxy confirmation flash listener
-    socket.on('display:confirm', (data: ConfirmationFlash) => {
+    const handleConfirm = (data: ConfirmationFlash) => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
       setConfirmation(data);
 
@@ -285,16 +290,22 @@ export const KioskDisplayPage: React.FC = () => {
       flashTimerRef.current = setTimeout(() => {
         setConfirmation(null);
       }, 5000);
-    });
+    };
 
     // Operational force refresh listener triggered by Caretaker/Warden
-    socket.on('device:force_refresh', () => {
+    const handleForceRefresh = () => {
       fetchNextQrToken();
-    });
+    };
+
+    socket.on('display:confirm', handleConfirm);
+    socket.on('device:force_refresh', handleForceRefresh);
 
     return () => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      socket.disconnect();
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('display:confirm', handleConfirm);
+      socket.off('device:force_refresh', handleForceRefresh);
     };
   }, [deviceId, fetchNextQrToken]);
 

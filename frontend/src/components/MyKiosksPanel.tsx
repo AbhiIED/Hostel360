@@ -12,7 +12,7 @@ import {
   QrCode,
   MapPin,
 } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { getSocket } from '../api/socket';
 
 interface KioskDevice {
   id: string;
@@ -76,16 +76,21 @@ export const MyKiosksPanel: React.FC<MyKiosksPanelProps> = ({ hostelId }) => {
 
   // Real-time socket updates for heartbeats / refreshes
   useEffect(() => {
-    const socket = io('/', { transports: ['websocket', 'polling'] });
+    const socket = getSocket();
 
-    socket.on('connect', () => {
+    const joinRooms = () => {
       if (hostelId) {
         socket.emit('join', `hostel:${hostelId}`);
       }
       socket.emit('join', 'admin:feed');
-    });
+    };
 
-    socket.on('device:heartbeat', (data: { deviceId: string; timestamp: string }) => {
+    if (socket.connected) {
+      joinRooms();
+    }
+    socket.on('connect', joinRooms);
+
+    const handleHeartbeat = (data: { deviceId: string; timestamp: string }) => {
       setDevices((prev) =>
         prev.map((d) =>
           d.id === data.deviceId
@@ -93,9 +98,9 @@ export const MyKiosksPanel: React.FC<MyKiosksPanelProps> = ({ hostelId }) => {
             : d
         )
       );
-    });
+    };
 
-    socket.on('device:force_refresh', (data: { deviceId: string }) => {
+    const handleDeviceRefresh = (data: { deviceId: string }) => {
       setDevices((prev) =>
         prev.map((d) =>
           d.id === data.deviceId
@@ -103,10 +108,15 @@ export const MyKiosksPanel: React.FC<MyKiosksPanelProps> = ({ hostelId }) => {
             : d
         )
       );
-    });
+    };
+
+    socket.on('device:heartbeat', handleHeartbeat);
+    socket.on('device:force_refresh', handleDeviceRefresh);
 
     return () => {
-      socket.disconnect();
+      socket.off('connect', joinRooms);
+      socket.off('device:heartbeat', handleHeartbeat);
+      socket.off('device:force_refresh', handleDeviceRefresh);
     };
   }, [hostelId]);
 

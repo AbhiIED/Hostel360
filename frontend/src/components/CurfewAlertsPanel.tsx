@@ -8,7 +8,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { getSocket } from '../api/socket';
 
 interface CurfewAlert {
   id: string;
@@ -85,30 +85,40 @@ export const CurfewAlertsPanel: React.FC<CurfewAlertsPanelProps> = ({
 
   // Real-time socket updates
   useEffect(() => {
-    const socket = io('/', { transports: ['websocket', 'polling'] });
+    const socket = getSocket();
 
-    socket.on('connect', () => {
+    const joinRooms = () => {
       if (hostelId) {
         socket.emit('join', `hostel:${hostelId}`);
       }
       socket.emit('join', 'admin:feed');
       socket.emit('join', 'admin:curfew');
-    });
+    };
 
-    socket.on('curfew:alert', (newAlert: CurfewAlert) => {
+    if (socket.connected) {
+      joinRooms();
+    }
+    socket.on('connect', joinRooms);
+
+    const handleAlert = (newAlert: CurfewAlert) => {
       if (showAllHostels || !hostelId || newAlert.hostel_id === hostelId) {
         setAlerts((prev) => [newAlert, ...prev.filter((a) => a.id !== newAlert.id)]);
       }
-    });
+    };
 
-    socket.on('curfew:alert_updated', (updated: CurfewAlert) => {
+    const handleAlertUpdated = (updated: CurfewAlert) => {
       setAlerts((prev) =>
         prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a))
       );
-    });
+    };
+
+    socket.on('curfew:alert', handleAlert);
+    socket.on('curfew:alert_updated', handleAlertUpdated);
 
     return () => {
-      socket.disconnect();
+      socket.off('connect', joinRooms);
+      socket.off('curfew:alert', handleAlert);
+      socket.off('curfew:alert_updated', handleAlertUpdated);
     };
   }, [hostelId, showAllHostels]);
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { io, Socket } from 'socket.io-client';
+import { getSocket } from '../api/socket';
+import type { Socket } from 'socket.io-client';
 import {
   Building2,
   GraduationCap,
@@ -73,10 +74,10 @@ export const DashboardHubPage: React.FC = () => {
 
   // Real-Time Socket.IO Connections
   useEffect(() => {
-    const socket = io('/', { transports: ['websocket', 'polling'] });
+    const socket = getSocket();
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const joinRooms = () => {
       if (user?.role === 'SUPER_ADMIN') {
         socket.emit('join', 'admin:feed');
       } else if (['WARDEN', 'VICE_WARDEN', 'CARETAKER'].includes(user?.role || '') && selectedHostelId) {
@@ -84,9 +85,14 @@ export const DashboardHubPage: React.FC = () => {
       } else if (user?.role === 'MESS_ADMIN' && messData?.mess?.id) {
         socket.emit('join', `mess:${messData.mess.id}`);
       }
-    });
+    };
 
-    socket.on('attendance:new', (event: any) => {
+    if (socket.connected) {
+      joinRooms();
+    }
+    socket.on('connect', joinRooms);
+
+    const handleAttendance = (event: any) => {
       setLiveHostelFeed((prev) => [event, ...prev.slice(0, 39)]);
 
       if (user?.role === 'SUPER_ADMIN') {
@@ -104,9 +110,9 @@ export const DashboardHubPage: React.FC = () => {
           };
         });
       }
-    });
+    };
 
-    socket.on('mess:attendance:new', (event: any) => {
+    const handleMessAttendance = (event: any) => {
       setLiveMessFeed((prev) => [event, ...prev.slice(0, 39)]);
 
       if (user?.role === 'MESS_ADMIN') {
@@ -123,10 +129,15 @@ export const DashboardHubPage: React.FC = () => {
           };
         });
       }
-    });
+    };
+
+    socket.on('attendance:new', handleAttendance);
+    socket.on('mess:attendance:new', handleMessAttendance);
 
     return () => {
-      socket.disconnect();
+      socket.off('connect', joinRooms);
+      socket.off('attendance:new', handleAttendance);
+      socket.off('mess:attendance:new', handleMessAttendance);
     };
   }, [user?.role, selectedHostelId, messData?.mess?.id]);
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import CurfewAlertsPanel from '../components/CurfewAlertsPanel';
 import LeaveRequestsPanel from '../components/LeaveRequestsPanel';
+import MyKiosksPanel from '../components/MyKiosksPanel';
 
 export const DashboardHubPage: React.FC = () => {
   const { user } = useAuth();
@@ -168,6 +169,12 @@ export const DashboardHubPage: React.FC = () => {
               className="px-3 py-1.5 text-[#5B6472] hover:text-[#1C2430] transition font-normal"
             >
               Student roster and corrections
+            </Link>
+            <Link
+              to="/dashboard/curfew"
+              className="px-3 py-1.5 text-[#5B6472] hover:text-[#1C2430] transition font-normal"
+            >
+              Curfew & Out-pass
             </Link>
             <Link
               to="/dashboard/history"
@@ -363,6 +370,12 @@ export const DashboardHubPage: React.FC = () => {
 
           {/* Module 3: Curfew Alerts Panel */}
           <CurfewAlertsPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+          {/* Module 4: My Kiosks (Operational Hardware Status) */}
+          <MyKiosksPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+          {/* Module 5: Leave Requests (Tiered Approvals) */}
+          <LeaveRequestsPanel hostelId={selectedHostelId || assignedHostel?.id} />
         </div>
       </div>
     );

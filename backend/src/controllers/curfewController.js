@@ -5,6 +5,7 @@ import {
   isStudentInCurfew,
   triggerCurfewSweep,
   getActiveCurfewWindowsForHostel,
+  calculateLeaveRiskTier,
 } from '../services/curfewService.js';
 
 // --- Zod Validation Schemas ---
@@ -15,6 +16,7 @@ const curfewWindowSchema = z.object({
   start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Format must be HH:mm or HH:mm:ss'),
   end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Format must be HH:mm or HH:mm:ss'),
   grace_period_minutes: z.number().int().min(0).max(180).default(30),
+  max_low_risk_hours: z.number().int().min(1).max(72).default(8),
   is_active: z.boolean().default(true),
 });
 
@@ -77,6 +79,7 @@ export async function createCurfewWindow(req, res) {
         start_time,
         end_time,
         grace_period_minutes: data.grace_period_minutes,
+        max_low_risk_hours: data.max_low_risk_hours ?? 8,
         is_active: data.is_active,
         updated_by: req.user.id,
       },
@@ -225,6 +228,8 @@ export async function createLeaveRequest(req, res) {
       return res.status(400).json({ error: 'requested_to must be after requested_from' });
     }
 
+    const riskTier = await calculateLeaveRiskTier(student.hostel_id, fromDate, toDate);
+
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         student_id: student.id,
@@ -233,6 +238,7 @@ export async function createLeaveRequest(req, res) {
         requested_to: toDate,
         reason,
         status: 'PENDING',
+        risk_tier: riskTier,
       },
       include: {
         student: {
@@ -242,6 +248,8 @@ export async function createLeaveRequest(req, res) {
           },
         },
         hostel: { select: { id: true, name: true, code: true } },
+        decider: { select: { id: true, name: true, role: true } },
+        caretaker_verifier: { select: { id: true, name: true, role: true } },
       },
     });
 
@@ -261,6 +269,159 @@ export async function createLeaveRequest(req, res) {
   }
 }
 
+export async function editLeaveRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const parseResult = leaveRequestSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: 'Validation failed', details: parseResult.error.flatten() });
+    }
+
+    const { requested_from, requested_to, reason } = parseResult.data;
+    const fromDate = new Date(requested_from);
+    const toDate = new Date(requested_to);
+
+    if (fromDate >= toDate) {
+      return res.status(400).json({ error: 'requested_to must be after requested_from' });
+    }
+
+    const existing = await prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { student: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Leave request not found' });
+    }
+
+    // Only creator student can edit
+    if (existing.student.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only edit your own leave requests' });
+    }
+
+    // Can only edit if still PENDING
+    if (existing.status !== 'PENDING') {
+      return res.status(400).json({ error: `Cannot edit leave request in ${existing.status} status` });
+    }
+
+    // Re-evaluate risk tier dynamically
+    const newRiskTier = await calculateLeaveRiskTier(existing.hostel_id, fromDate, toDate);
+
+    const updated = await prisma.leaveRequest.update({
+      where: { id },
+      data: {
+        requested_from: fromDate,
+        requested_to: toDate,
+        reason,
+        risk_tier: newRiskTier,
+      },
+      include: {
+        student: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            room: { select: { room_number: true, floor: true, block: true } },
+          },
+        },
+        hostel: { select: { id: true, name: true, code: true } },
+        decider: { select: { id: true, name: true, role: true } },
+        caretaker_verifier: { select: { id: true, name: true, role: true } },
+      },
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`hostel:${existing.hostel_id}`).emit('curfew:leave_request:updated', updated);
+      io.to('admin:feed').emit('curfew:leave_request:updated', updated);
+    }
+
+    return res.json({
+      message: 'Leave request updated successfully',
+      leave_request: updated,
+    });
+  } catch (error) {
+    console.error('editLeaveRequest error:', error);
+    return res.status(500).json({ error: 'Failed to update leave request' });
+  }
+}
+
+export async function verifyLeaveRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      return res.status(400).json({ error: 'Verification note is required' });
+    }
+
+    const request = await prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { student: true },
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: 'Leave request not found' });
+    }
+
+    // Verify hostel access
+    if (!userHasHostelAccess(req.user, request.hostel_id)) {
+      return res.status(403).json({ error: 'You do not have permission to verify leave for this hostel' });
+    }
+
+    if (request.status !== 'PENDING') {
+      return res.status(400).json({ error: `Cannot verify leave request in ${request.status} status` });
+    }
+
+    const updated = await prisma.leaveRequest.update({
+      where: { id },
+      data: {
+        caretaker_verified_by: req.user.id,
+        caretaker_verified_at: new Date(),
+        caretaker_note: note.trim(),
+      },
+      include: {
+        student: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            room: { select: { room_number: true, floor: true, block: true } },
+          },
+        },
+        hostel: { select: { id: true, name: true, code: true } },
+        decider: { select: { id: true, name: true, role: true } },
+        caretaker_verifier: { select: { id: true, name: true, role: true } },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'LEAVE_REQUEST_CARETAKER_VERIFIED',
+        target_type: 'LeaveRequest',
+        target_id: id,
+        meta: {
+          student_id: request.student_id,
+          note: note.trim(),
+          verifierRole: req.user.role,
+        },
+      },
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`hostel:${request.hostel_id}`).emit('curfew:leave_request:updated', updated);
+      io.to('admin:feed').emit('curfew:leave_request:updated', updated);
+    }
+
+    return res.json({
+      message: 'Leave request verified by caretaker successfully',
+      leave_request: updated,
+    });
+  } catch (error) {
+    console.error('verifyLeaveRequest error:', error);
+    return res.status(500).json({ error: 'Failed to verify leave request' });
+  }
+}
+
 export async function getSelfLeaveRequests(req, res) {
   try {
     const student = await prisma.student.findUnique({
@@ -274,7 +435,8 @@ export async function getSelfLeaveRequests(req, res) {
     const requests = await prisma.leaveRequest.findMany({
       where: { student_id: student.id },
       include: {
-        approver: { select: { id: true, name: true, role: true } },
+        decider: { select: { id: true, name: true, role: true } },
+        caretaker_verifier: { select: { id: true, name: true, role: true } },
         hostel: { select: { id: true, name: true } },
       },
       orderBy: { created_at: 'desc' },
@@ -289,7 +451,7 @@ export async function getSelfLeaveRequests(req, res) {
 
 export async function listLeaveRequests(req, res) {
   try {
-    const { status, hostel_id, page = '1', limit = '50' } = req.query;
+    const { status, hostel_id, risk_tier, page = '1', limit = '50' } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
     const skip = (pageNum - 1) * limitNum;
@@ -312,6 +474,10 @@ export async function listLeaveRequests(req, res) {
       where.status = status;
     }
 
+    if (risk_tier && ['LOW', 'HIGH'].includes(risk_tier)) {
+      where.risk_tier = risk_tier;
+    }
+
     const [total, requests] = await Promise.all([
       prisma.leaveRequest.count({ where }),
       prisma.leaveRequest.findMany({
@@ -324,7 +490,8 @@ export async function listLeaveRequests(req, res) {
             },
           },
           hostel: { select: { id: true, name: true, code: true } },
-          approver: { select: { id: true, name: true, role: true } },
+          decider: { select: { id: true, name: true, role: true } },
+          caretaker_verifier: { select: { id: true, name: true, role: true } },
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -370,12 +537,20 @@ export async function updateLeaveRequestStatus(req, res) {
       return res.status(403).json({ error: 'You do not have permission to manage leave for this hostel' });
     }
 
+    // Risk tier rule: HIGH tier requires WARDEN or VICE_WARDEN (or SUPER_ADMIN)
+    if (request.risk_tier === 'HIGH' && req.user.role === 'CARETAKER') {
+      return res.status(403).json({
+        error: 'High-risk leave requests require Warden or Vice Warden decision. Caretakers can only submit verification.',
+        code: 'TIER_REQUIRES_WARDEN',
+      });
+    }
+
     const updated = await prisma.leaveRequest.update({
       where: { id },
       data: {
         status,
-        approved_by: req.user.id,
-        approved_at: new Date(),
+        decided_by: req.user.id,
+        decided_at: new Date(),
       },
       include: {
         student: {
@@ -385,7 +560,8 @@ export async function updateLeaveRequestStatus(req, res) {
           },
         },
         hostel: { select: { id: true, name: true, code: true } },
-        approver: { select: { id: true, name: true, role: true } },
+        decider: { select: { id: true, name: true, role: true } },
+        caretaker_verifier: { select: { id: true, name: true, role: true } },
       },
     });
 
@@ -399,6 +575,8 @@ export async function updateLeaveRequestStatus(req, res) {
         meta: {
           student_id: request.student_id,
           status,
+          risk_tier: request.risk_tier,
+          deciderRole: req.user.role,
         },
       },
     });

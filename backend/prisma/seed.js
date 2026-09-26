@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -529,6 +530,79 @@ async function main() {
   }
 
   console.log('✅ Seeded 5 MANIT students with gender-appropriate hostel assignments.');
+
+  // 11. Seed Campus Kiosk Devices with Distinct 32-Byte Secrets (No shared/hardcoded kiosk123)
+  const h1Gate = await prisma.gate.findFirst({ where: { hostel_id: hostelMap[1].id } });
+  const h5Gate = await prisma.gate.findFirst({ where: { hostel_id: hostelMap[5].id } });
+  const h7Gate = await prisma.gate.findFirst({ where: { hostel_id: hostelMap[7].id } });
+
+  const devicesToSeed = [
+    {
+      code: 'H1_GATE_TEST_7214',
+      name: 'Hostel 1 Main Gate Kiosk',
+      purpose: 'GATE',
+      gate_id: h1Gate?.id,
+      mess_id: null,
+    },
+    {
+      code: 'H5_GATE_MAIN',
+      name: 'Hostel 5 Main Gate Kiosk',
+      purpose: 'GATE',
+      gate_id: h5Gate?.id,
+      mess_id: null,
+    },
+    {
+      code: 'H7_GATE_1',
+      name: 'Hostel 7 Girls Gate Kiosk',
+      purpose: 'GATE',
+      gate_id: h7Gate?.id,
+      mess_id: null,
+    },
+    {
+      code: 'MESS_DEV_8859',
+      name: 'Central Mess Counter Kiosk',
+      purpose: 'MESS',
+      gate_id: null,
+      mess_id: centralMess.id,
+    },
+  ];
+
+  const seededDevices = [];
+  for (const dev of devicesToSeed) {
+    const rawSecret = crypto.randomBytes(32).toString('hex');
+    const secretHash = await bcrypt.hash(rawSecret, 10);
+
+    const deviceRecord = await prisma.device.upsert({
+      where: { device_code: dev.code },
+      update: {
+        device_name: dev.name,
+        purpose: dev.purpose,
+        gate_id: dev.gate_id,
+        mess_id: dev.mess_id,
+        secret_hash: secretHash,
+        is_active: true,
+      },
+      create: {
+        device_code: dev.code,
+        device_name: dev.name,
+        purpose: dev.purpose,
+        gate_id: dev.gate_id,
+        mess_id: dev.mess_id,
+        secret_hash: secretHash,
+        is_active: true,
+        registered_by: superAdmin.id,
+      },
+    });
+
+    seededDevices.push({
+      code: dev.code,
+      name: dev.name,
+      purpose: dev.purpose,
+      secret: rawSecret,
+    });
+  }
+
+  console.log('✅ Seeded 4 Hardware Kiosks with unique 32-byte secrets (per-device binding enforced).');
   console.log('🚀 MANIT Campus Seed completed successfully!');
   console.log('');
   console.log('📋 Login Credentials:');
@@ -542,6 +616,11 @@ async function main() {
   console.log('  Caretaker (H5):    caretaker.h5@hostel360.com / password123');
   console.log('  Mess Admin:        messadmin@hostel360.com / password123');
   console.log('  Student (Aarav):   aarav.sharma@student.hostel360.com / password123');
+  console.log('');
+  console.log('🔑 Seeded Kiosk Hardware Secrets (Shown Once):');
+  for (const sd of seededDevices) {
+    console.log(`  [${sd.purpose}] ${sd.name} (${sd.code}): ${sd.secret}`);
+  }
 }
 
 main()

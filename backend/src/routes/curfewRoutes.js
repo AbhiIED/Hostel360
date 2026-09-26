@@ -7,6 +7,8 @@ import {
   deleteCurfewWindow,
   triggerManualSweep,
   createLeaveRequest,
+  editLeaveRequest,
+  verifyLeaveRequest,
   getSelfLeaveRequests,
   listLeaveRequests,
   updateLeaveRequestStatus,
@@ -28,9 +30,11 @@ router.post('/sweep', authenticate, authorize('SUPER_ADMIN', 'WARDEN', 'VICE_WAR
 
 // --- Leave Requests (Out-Pass) Workflow ---
 router.post('/leave-requests', authenticate, authorize('STUDENT'), createLeaveRequest);
+router.patch('/leave-requests/:id', authenticate, authorize('STUDENT'), editLeaveRequest);
 router.get('/leave-requests/self', authenticate, authorize('STUDENT'), getSelfLeaveRequests);
 router.get('/leave-requests', authenticate, authorize('WARDEN', 'VICE_WARDEN', 'CARETAKER', 'SUPER_ADMIN'), listLeaveRequests);
-router.patch('/leave-requests/:id/status', authenticate, authorize('WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), updateLeaveRequestStatus);
+router.patch('/leave-requests/:id/verify', authenticate, authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), verifyLeaveRequest);
+router.patch('/leave-requests/:id/status', authenticate, authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), updateLeaveRequestStatus);
 router.patch('/leave-requests/:id/cancel', authenticate, authorize('STUDENT'), cancelLeaveRequest);
 
 // --- Curfew Alerts & Resolution ---

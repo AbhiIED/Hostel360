@@ -255,3 +255,64 @@ export async function executeCurfewSweepRecheck(hostelId, window, io) {
 
   return createdAlerts;
 }
+
+/**
+ * Calculates risk tier for a leave request:
+ * - HIGH if the request spans any part of an active curfew_windows entry for that hostel,
+ * - or if requested_to - requested_from exceeds max_low_risk_hours (default 8)
+ * - LOW otherwise.
+ * @param {string} hostelId
+ * @param {Date|string} requestedFrom
+ * @param {Date|string} requestedTo
+ * @param {object} [tx]
+ * @returns {Promise<'LOW'|'HIGH'>}
+ */
+export async function calculateLeaveRiskTier(hostelId, requestedFrom, requestedTo, tx = prisma) {
+  const from = new Date(requestedFrom);
+  const to = new Date(requestedTo);
+
+  const durationMs = to.getTime() - from.getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+
+  // 1. Fetch active windows for hostel (or campus defaults)
+  const windows = await getActiveCurfewWindowsForHostel(hostelId, tx);
+
+  // Threshold: use minimum configured max_low_risk_hours among active windows, or 8
+  let thresholdHours = 8;
+  if (windows.length > 0) {
+    const configuredThresholds = windows
+      .map((w) => w.max_low_risk_hours)
+      .filter((t) => t != null && !isNaN(t));
+    if (configuredThresholds.length > 0) {
+      thresholdHours = Math.min(...configuredThresholds);
+    }
+  }
+
+  // If duration exceeds threshold, it's HIGH risk
+  if (durationHours > thresholdHours) {
+    return 'HIGH';
+  }
+
+  // 2. Check if request spans any part of active curfew windows
+  if (windows.length > 0) {
+    // Step by 10 minutes between `from` and `to`
+    const stepMs = 10 * 60 * 1000;
+    for (let t = from.getTime(); t <= to.getTime(); t += stepMs) {
+      const checkDate = new Date(t);
+      for (const win of windows) {
+        if (isDateInCurfewWindow(win, checkDate)) {
+          return 'HIGH';
+        }
+      }
+    }
+    // Also check endpoint `to`
+    for (const win of windows) {
+      if (isDateInCurfewWindow(win, to)) {
+        return 'HIGH';
+      }
+    }
+  }
+
+  return 'LOW';
+}
+

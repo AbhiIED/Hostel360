@@ -146,19 +146,19 @@ const HomeView = () => {
                 className="flex items-center justify-between p-2 rounded bg-[#FAF9F6] border border-[#E4E1DA] hover:border-[#26415C] text-xs transition"
               >
                 <span className="font-medium text-[#1C2430]">H1 Gate display (Boys)</span>
-                <span className="text-[11px] text-[#5B6472] font-mono">Secret: kiosk123</span>
+                <span className="text-[11px] text-[#5B6472] font-mono">Terminal bound</span>
               </Link>
               <Link
                 to="/display/mess/MESS_DEV_8859"
                 className="flex items-center justify-between p-2 rounded bg-[#FAF9F6] border border-[#E4E1DA] hover:border-[#26415C] text-xs transition"
               >
                 <span className="font-medium text-[#1C2430]">Central mess display</span>
-                <span className="text-[11px] text-[#5B6472] font-mono">Secret: kiosk123</span>
+                <span className="text-[11px] text-[#5B6472] font-mono">Terminal bound</span>
               </Link>
             </div>
           </div>
           <p className="text-[11px] text-[#5B6472] text-center">
-            Hardware authenticated via device secret and HMAC tokens
+            Hardware authenticated via unique per-device secrets and opaque SHA-256 tokens
           </p>
         </div>
       </div>

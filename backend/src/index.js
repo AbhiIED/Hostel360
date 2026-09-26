@@ -16,8 +16,30 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import curfewRoutes from './routes/curfewRoutes.js';
 import { startTokenSweeper } from './services/sweeper.js';
 import { startCurfewScheduler } from './services/curfewScheduler.js';
+import prisma from './prisma.js';
 
 dotenv.config();
+
+/**
+ * Startup and migration check: Fails loudly if any two active devices share the same secret hash.
+ */
+export async function verifyDeviceSecretsIntegrity() {
+  const activeDevices = await prisma.device.findMany({
+    where: { is_active: true },
+    select: { id: true, device_code: true, device_name: true, secret_hash: true },
+  });
+
+  const seenHashes = new Set();
+  for (const device of activeDevices) {
+    if (seenHashes.has(device.secret_hash)) {
+      const msg = `CRITICAL SECURITY REGRESSION: Active devices share duplicate secret_hash! Device: ${device.device_name} (${device.device_code || device.id})`;
+      console.error(msg);
+      throw new Error(msg);
+    }
+    seenHashes.add(device.secret_hash);
+  }
+  return true;
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -135,14 +157,21 @@ const isTestEnv =
   process.argv.some((a) => a.includes('test'));
 
 if (!isTestEnv) {
-  server.listen(PORT, () => {
-    console.log(`🚀 HOSTEL360 Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
-    // Start background QR token expiration sweeper
-    startTokenSweeper();
-    // Start continuous curfew background scheduler
-    startCurfewScheduler(io);
-  });
+  verifyDeviceSecretsIntegrity()
+    .then(() => {
+      server.listen(PORT, () => {
+        console.log(`🚀 HOSTEL360 Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+        console.log(`Health check: http://localhost:${PORT}/api/health`);
+        // Start background QR token expiration sweeper
+        startTokenSweeper();
+        // Start continuous curfew background scheduler
+        startCurfewScheduler(io);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to start server due to security integrity failure:', err.message);
+      process.exit(1);
+    });
 }
 
 export { app, server, io };

@@ -257,8 +257,8 @@ describe('Continuous-Logging Curfew System Tests (Phase 12)', () => {
         requested_to: new Date(now.getTime() + 24 * 60 * 60 * 1000), // tomorrow
         reason: 'Authorized emergency leave to visit family',
         status: 'APPROVED',
-        approved_by: adminUser.id,
-        approved_at: new Date(),
+        decided_by: adminUser.id,
+        decided_at: new Date(),
       },
     });
 
@@ -335,7 +335,8 @@ describe('Continuous-Logging Curfew System Tests (Phase 12)', () => {
         requested_to: new Date(now.getTime() + 1000 * 60 * 60 * 12),
         reason: 'Authorized out-pass',
         status: 'APPROVED',
-        approved_by: adminUser.id,
+        decided_by: adminUser.id,
+        decided_at: new Date(),
       },
     });
 

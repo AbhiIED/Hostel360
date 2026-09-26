@@ -287,11 +287,16 @@ export const KioskDisplayPage: React.FC = () => {
       }, 5000);
     });
 
+    // Operational force refresh listener triggered by Caretaker/Warden
+    socket.on('device:force_refresh', () => {
+      fetchNextQrToken();
+    });
+
     return () => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
       socket.disconnect();
     };
-  }, [deviceId]);
+  }, [deviceId, fetchNextQrToken]);
 
   // Handle Fullscreen Toggle
   const toggleFullscreen = () => {
@@ -639,7 +644,7 @@ export const KioskDisplayPage: React.FC = () => {
           <span className="text-[#E4E1DA]">•</span>
           <span>Type: <strong className="text-[#1C2430] font-medium">{deviceInfo?.purpose || 'GATE'}</strong></span>
           <span className="text-[#E4E1DA]">•</span>
-          <span>Security: <strong className="text-[#2E7D5B] font-medium">SHA-256 HMAC Opaque</strong></span>
+          <span>Security: <strong className="text-[#2E7D5B] font-medium">Opaque SHA-256 Hash</strong></span>
         </div>
         <div className="flex items-center gap-3">
           <span>Council of Wardens • MANIT Bhopal</span>

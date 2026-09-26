@@ -97,6 +97,11 @@ enum DevicePresenceEventType {
   DISCONNECTED
 }
 
+enum RiskTier {
+  LOW
+  HIGH
+}
+
 model User {
   id            String         @id @default(uuid())
   name          String         @db.VarChar(120)
@@ -113,7 +118,8 @@ model User {
   registered_devices       Device[]                @relation("UserRegisteredDevices")
   refresh_tokens           RefreshToken[]
   updated_curfew_windows   CurfewWindow[]          @relation("UserUpdatedCurfewWindows")
-  approved_leave_requests  LeaveRequest[]          @relation("UserApprovedLeaveRequests")
+  decided_leave_requests   LeaveRequest[]          @relation("UserDecidedLeaveRequests")
+  verified_leave_requests  LeaveRequest[]          @relation("UserVerifiedLeaveRequests")
   resolved_curfew_alerts   CurfewAlert[]           @relation("UserResolvedCurfewAlerts")
 
   @@map("users")
@@ -211,7 +217,7 @@ model Device {
   gate              Gate?         @relation(fields: [gate_id], references: [id], onDelete: SetNull)
   mess_id           String?
   mess              Mess?         @relation(fields: [mess_id], references: [id], onDelete: SetNull)
-  secret_hash       String        @db.VarChar(255)
+  secret_hash       String        @unique @db.VarChar(255)
   is_active         Boolean       @default(true)
   last_heartbeat_at DateTime?
   registered_by     String
@@ -392,6 +398,7 @@ model CurfewWindow {
   start_time           String   @db.VarChar(8)
   end_time             String   @db.VarChar(8)
   grace_period_minutes Int      @default(30)
+  max_low_risk_hours   Int      @default(8)
   is_active            Boolean  @default(true)
   updated_by           String?
   updater              User?    @relation("UserUpdatedCurfewWindows", fields: [updated_by], references: [id], onDelete: SetNull)
@@ -403,26 +410,34 @@ model CurfewWindow {
 }
 
 model LeaveRequest {
-  id             String             @id @default(uuid())
-  student_id     String
-  student        Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
-  hostel_id      String
-  hostel         Hostel             @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
-  requested_from DateTime
-  requested_to   DateTime
-  reason         String             @db.Text
-  status         LeaveRequestStatus @default(PENDING)
-  approved_by    String?
-  approver       User?              @relation("UserApprovedLeaveRequests", fields: [approved_by], references: [id], onDelete: SetNull)
-  approved_at    DateTime?
-  created_at     DateTime           @default(now())
-  updated_at     DateTime           @updatedAt
+  id                    String             @id @default(uuid())
+  student_id            String
+  student               Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  hostel_id             String
+  hostel                Hostel             @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  requested_from        DateTime
+  requested_to          DateTime
+  reason                String             @db.Text
+  status                LeaveRequestStatus @default(PENDING)
+  risk_tier             RiskTier           @default(LOW)
+  caretaker_verified_by String?
+  caretaker_verifier    User?              @relation("UserVerifiedLeaveRequests", fields: [caretaker_verified_by], references: [id], onDelete: SetNull)
+  caretaker_verified_at DateTime?
+  caretaker_note        String?            @db.Text
+  decided_by            String?
+  decider               User?              @relation("UserDecidedLeaveRequests", fields: [decided_by], references: [id], onDelete: SetNull)
+  decided_at            DateTime?
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @updatedAt
 
   curfew_alerts CurfewAlert[]
 
   @@index([student_id, status])
   @@index([hostel_id, status])
   @@index([requested_from, requested_to])
+  @@index([risk_tier])
+  @@index([decided_by])
+  @@index([caretaker_verified_by])
   @@map("leave_requests")
 }
 

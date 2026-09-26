@@ -11,7 +11,7 @@ import { isStudentInCurfew, getCoveringApprovedLeave } from '../services/curfewS
  */
 export async function scanAttendance(req, res) {
   try {
-    const { token } = req.body;
+    const { token, device_id } = req.body;
 
     if (!token || typeof token !== 'string') {
       return res.status(400).json({ error: 'Token string is required', code: 'MISSING_TOKEN' });
@@ -32,7 +32,7 @@ export async function scanAttendance(req, res) {
     }
 
     // 2. Validate and consume the QR token (atomically marks status: USED)
-    const consumeResult = await validateAndConsume(token.trim());
+    const consumeResult = await validateAndConsume(token.trim(), device_id);
 
     if (!consumeResult.valid) {
       // 6.6 Audit log for failed scan attempt
@@ -57,6 +57,7 @@ export async function scanAttendance(req, res) {
         TOKEN_EXPIRED: 410,
         TOKEN_REVOKED: 410,
         DEVICE_INACTIVE: 403,
+        DEVICE_MISMATCH: 400,
       };
 
       const statusCode = statusMap[consumeResult.code] || 400;

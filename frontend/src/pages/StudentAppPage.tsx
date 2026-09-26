@@ -20,6 +20,9 @@ import {
   Send,
   X,
   AlertCircle,
+  Edit2,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface StudentProfile {
@@ -89,6 +92,9 @@ export const StudentAppPage: React.FC = () => {
   const [leaveSubmitting, setLeaveSubmitting] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null);
+  const [editingLeave, setEditingLeave] = useState<any | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Scanner State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
@@ -187,6 +193,37 @@ export const StudentAppPage: React.FC = () => {
       setLeaveError(err.response?.data?.error || 'Failed to submit leave request');
     } finally {
       setLeaveSubmitting(false);
+    }
+  };
+
+  const handleEditLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLeave) return;
+
+    const from = new Date(editingLeave.requested_from);
+    const to = new Date(editingLeave.requested_to);
+
+    if (from >= to) {
+      setEditError('Return date must be chronologically after departure date');
+      return;
+    }
+
+    setEditSubmitting(true);
+    setEditError(null);
+
+    try {
+      await api.patch(`/curfew/leave-requests/${editingLeave.id}`, {
+        requested_from: from.toISOString(),
+        requested_to: to.toISOString(),
+        reason: editingLeave.reason.trim(),
+      });
+      setLeaveSuccess('Out-pass request updated successfully (Risk tier re-evaluated)');
+      setEditingLeave(null);
+      fetchLeaveData();
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || 'Failed to update leave request');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -939,9 +976,9 @@ export const StudentAppPage: React.FC = () => {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-[#E4E1DA] text-[#5B6472]">
-                      <th className="py-2.5 font-medium">Period</th>
+                      <th className="py-2.5 font-medium">Period & Risk Tier</th>
                       <th className="py-2.5 font-medium">Reason</th>
-                      <th className="py-2.5 font-medium">Status</th>
+                      <th className="py-2.5 font-medium">Status & Decider</th>
                       <th className="py-2.5 font-medium text-right">Action</th>
                     </tr>
                   </thead>
@@ -951,10 +988,25 @@ export const StudentAppPage: React.FC = () => {
                       const toDate = new Date(req.requested_to);
                       const now = new Date();
                       const canCancel = (req.status === 'PENDING' || req.status === 'APPROVED') && now < fromDate;
+                      const isPending = req.status === 'PENDING';
+                      const isHigh = req.risk_tier === 'HIGH';
 
                       return (
                         <tr key={req.id} className="hover:bg-[#FAF9F6] transition">
                           <td className="py-3 font-mono text-[#1C2430] tabular-nums whitespace-nowrap">
+                            <div className="mb-1">
+                              {isHigh ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]">
+                                  <ShieldAlert className="w-3 h-3 text-[#B7791F]" />
+                                  HIGH RISK (Warden)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
+                                  <ShieldCheck className="w-3 h-3 text-[#1D4ED8]" />
+                                  LOW RISK (Caretaker)
+                                </span>
+                              )}
+                            </div>
                             <div>
                               {fromDate.toLocaleString('en-IN', {
                                 month: 'short',
@@ -978,6 +1030,11 @@ export const StudentAppPage: React.FC = () => {
                             <p className="line-clamp-2 text-[#1C2430]" title={req.reason}>
                               {req.reason}
                             </p>
+                            {req.caretaker_note && (
+                              <div className="mt-1 text-[11px] text-[#26415C] bg-[#F1F5F9] p-1 rounded border border-[#E2E8F0]">
+                                <span className="font-medium">Caretaker note:</span> {req.caretaker_note}
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3">
@@ -994,24 +1051,55 @@ export const StudentAppPage: React.FC = () => {
                             >
                               {req.status}
                             </span>
-                            {req.approver && (
+                            {req.decider && (
                               <div className="text-[10px] text-[#5B6472] mt-0.5">
-                                Verified by {req.approver.name}
+                                Decided by {req.decider.name}
+                              </div>
+                            )}
+                            {req.caretaker_verifier && (
+                              <div className="text-[10px] text-[#2E7D5B] mt-0.5">
+                                Verified by {req.caretaker_verifier.name}
                               </div>
                             )}
                           </td>
 
                           <td className="py-3 text-right">
-                            {canCancel ? (
-                              <button
-                                onClick={() => handleCancelLeave(req.id)}
-                                className="px-2.5 py-1 text-xs text-[#DC2626] hover:bg-[#FEF2F2] border border-[#FCA5A5] rounded transition font-medium"
-                              >
-                                Cancel
-                              </button>
-                            ) : (
-                              <span className="text-[11px] text-[#5B6472]">—</span>
-                            )}
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isPending && (
+                                <button
+                                  onClick={() => {
+                                    const formatForInput = (d: string) => {
+                                      const date = new Date(d);
+                                      const pad = (n: number) => String(n).padStart(2, '0');
+                                      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+                                    };
+                                    setEditingLeave({
+                                      id: req.id,
+                                      requested_from: formatForInput(req.requested_from),
+                                      requested_to: formatForInput(req.requested_to),
+                                      reason: req.reason,
+                                    });
+                                    setEditError(null);
+                                  }}
+                                  className="px-2 py-1 text-xs text-[#26415C] hover:bg-[#F1F5F9] border border-[#CBD5E1] rounded transition font-medium inline-flex items-center gap-1"
+                                  title="Edit dates or reason (will re-evaluate risk tier)"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                              {canCancel && (
+                                <button
+                                  onClick={() => handleCancelLeave(req.id)}
+                                  className="px-2 py-1 text-xs text-[#DC2626] hover:bg-[#FEF2F2] border border-[#FCA5A5] rounded transition font-medium"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              {!isPending && !canCancel && (
+                                <span className="text-[11px] text-[#5B6472]">—</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1021,6 +1109,105 @@ export const StudentAppPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Edit Leave Request Modal */}
+          {editingLeave && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-lg border border-[#E4E1DA] shadow-xl max-w-lg w-full p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#E4E1DA]">
+                  <div className="flex items-center gap-2">
+                    <Edit2 className="w-4 h-4 text-[#26415C]" />
+                    <h3 className="font-serif text-base font-medium text-[#1C2430]">
+                      Edit Out-Pass Request
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setEditingLeave(null)}
+                    className="text-[#5B6472] hover:text-[#1C2430] p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {editError && (
+                  <div className="p-2.5 bg-[#FEF2F2] border border-[#FCA5A5] text-[#DC2626] rounded text-xs flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleEditLeaveSubmit} className="space-y-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-medium text-[#1C2430] mb-1">
+                        Departure Date & Time <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={editingLeave.requested_from}
+                        onChange={(e) =>
+                          setEditingLeave({ ...editingLeave, requested_from: e.target.value })
+                        }
+                        className="w-full p-2.5 border border-[#E4E1DA] rounded font-mono text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium text-[#1C2430] mb-1">
+                        Expected Return Date & Time <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={editingLeave.requested_to}
+                        onChange={(e) =>
+                          setEditingLeave({ ...editingLeave, requested_to: e.target.value })
+                        }
+                        className="w-full p-2.5 border border-[#E4E1DA] rounded font-mono text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-[#1C2430] mb-1">
+                      Purpose / Reason for Leave <span className="text-[#DC2626]">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={editingLeave.reason}
+                      onChange={(e) =>
+                        setEditingLeave({ ...editingLeave, reason: e.target.value })
+                      }
+                      className="w-full p-2.5 border border-[#E4E1DA] rounded text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    />
+                  </div>
+
+                  <div className="p-2.5 bg-[#FAF9F6] border border-[#E4E1DA] rounded text-[11px] text-[#5B6472]">
+                    Note: Updating dates will automatically recalculate the risk tier. If the duration exceeds 8 hours or overlaps curfew hours, the request will automatically escalate to HIGH tier (requiring Warden approval).
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-[#E4E1DA]">
+                    <button
+                      type="button"
+                      onClick={() => setEditingLeave(null)}
+                      className="px-3 py-1.5 text-xs text-[#5B6472] hover:text-[#1C2430] transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={editSubmitting}
+                      className="px-4 py-1.5 text-xs font-medium bg-[#26415C] text-white rounded hover:bg-[#1B2E42] transition disabled:opacity-50"
+                    >
+                      {editSubmitting ? 'Saving...' : 'Update & Re-evaluate'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

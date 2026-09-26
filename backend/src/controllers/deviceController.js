@@ -73,7 +73,11 @@ export async function registerDevice(req, res) {
     });
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(409).json({ error: 'A device with this device_code already exists' });
+      const target = error.meta?.target || '';
+      if (String(target).includes('secret_hash')) {
+        return res.status(409).json({ error: 'Device secret hash collision: two devices cannot share identical secrets' });
+      }
+      return res.status(409).json({ error: 'A device with this device_code or secret already exists' });
     }
     console.error('Register device error:', error);
     return res.status(500).json({ error: 'Internal server error registering device' });
@@ -211,3 +215,243 @@ export async function disableDevice(req, res) {
     return res.status(500).json({ error: 'Internal server error disabling device' });
   }
 }
+
+// B.1 Caretaker/Warden scoped devices list
+export async function listMyKiosks(req, res) {
+  try {
+    let whereCondition = {};
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const assignedHostelIds = req.user.staff_hostel_assignments?.map((a) => a.hostel_id) || [];
+      if (assignedHostelIds.length === 0) {
+        return res.json({ devices: [] });
+      }
+      whereCondition = {
+        OR: [
+          { gate: { hostel_id: { in: assignedHostelIds } } },
+          { mess: { hostel_id: { in: assignedHostelIds } } },
+        ],
+      };
+    }
+
+    const devices = await prisma.device.findMany({
+      where: whereCondition,
+      select: {
+        id: true,
+        device_code: true,
+        device_name: true,
+        purpose: true,
+        is_active: true,
+        last_heartbeat_at: true,
+        created_at: true,
+        gate: {
+          select: {
+            id: true,
+            name: true,
+            hostel: {
+              select: { id: true, name: true, code: true },
+            },
+          },
+        },
+        mess: {
+          select: {
+            id: true,
+            name: true,
+            hostel: {
+              select: { id: true, name: true, code: true },
+            },
+          },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const now = new Date();
+    // Enrich with live status and issuance health
+    const enriched = await Promise.all(
+      devices.map(async (dev) => {
+        const isOnline =
+          dev.is_active &&
+          dev.last_heartbeat_at &&
+          now.getTime() - new Date(dev.last_heartbeat_at).getTime() < 120000;
+
+        const recentTokenCount = await prisma.qrToken.count({
+          where: {
+            device_id: dev.id,
+            created_at: { gte: new Date(now.getTime() - 15 * 60 * 1000) },
+          },
+        });
+
+        const lastToken = await prisma.qrToken.findFirst({
+          where: { device_id: dev.id },
+          orderBy: { created_at: 'desc' },
+          select: { created_at: true, status: true },
+        });
+
+        return {
+          ...dev,
+          is_online: isOnline,
+          issuance_health: {
+            tokens_last_15m: recentTokenCount,
+            last_token_at: lastToken?.created_at || null,
+            last_token_status: lastToken?.status || null,
+          },
+        };
+      })
+    );
+
+    return res.json({ devices: enriched });
+  } catch (error) {
+    console.error('List my kiosks error:', error);
+    return res.status(500).json({ error: 'Internal server error fetching kiosks' });
+  }
+}
+
+// B.2 Force token refresh (Safe operational action)
+export async function forceRefreshToken(req, res) {
+  try {
+    const { id } = req.params;
+
+    const device = await prisma.device.findUnique({
+      where: { id },
+      include: {
+        gate: true,
+        mess: true,
+      },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Verify hostel scope for non-Super Admin
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const assignedHostelIds = req.user.staff_hostel_assignments?.map((a) => a.hostel_id) || [];
+      const deviceHostelId = device.gate?.hostel_id || device.mess?.hostel_id;
+      if (!deviceHostelId || !assignedHostelIds.includes(deviceHostelId)) {
+        return res.status(403).json({ error: 'Access denied: You are not assigned to this device hostel' });
+      }
+    }
+
+    if (!device.is_active) {
+      return res.status(400).json({ error: 'Cannot refresh an inactive or disabled device' });
+    }
+
+    // Revoke any existing UNUSED tokens for this device
+    await prisma.qrToken.updateMany({
+      where: {
+        device_id: id,
+        status: 'UNUSED',
+      },
+      data: { status: 'REVOKED' },
+    });
+
+    // Write audit log
+    await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'DEVICE_FORCE_REFRESH',
+        target_type: 'Device',
+        target_id: id,
+        meta: {
+          deviceName: device.device_name,
+          deviceCode: device.device_code,
+          triggeredByRole: req.user.role,
+        },
+      },
+    });
+
+    // Notify connected kiosk via Socket.IO
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`device:${device.id}`).emit('device:force_refresh', {
+        deviceId: id,
+        timestamp: new Date().toISOString(),
+        triggeredBy: req.user.name,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: `Token refresh triggered successfully for ${device.device_name}`,
+    });
+  } catch (error) {
+    console.error('Force refresh error:', error);
+    return res.status(500).json({ error: 'Internal server error triggering token refresh' });
+  }
+}
+
+// B.3 Report malfunction (Super Admin alert without deactivation)
+export async function reportMalfunction(req, res) {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      return res.status(400).json({ error: 'Malfunction note is required' });
+    }
+
+    const device = await prisma.device.findUnique({
+      where: { id },
+      include: {
+        gate: true,
+        mess: true,
+      },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Verify hostel scope for non-Super Admin
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const assignedHostelIds = req.user.staff_hostel_assignments?.map((a) => a.hostel_id) || [];
+      const deviceHostelId = device.gate?.hostel_id || device.mess?.hostel_id;
+      if (!deviceHostelId || !assignedHostelIds.includes(deviceHostelId)) {
+        return res.status(403).json({ error: 'Access denied: You are not assigned to this device hostel' });
+      }
+    }
+
+    // Create audit log for Super Admin visibility
+    const audit = await prisma.auditLog.create({
+      data: {
+        actor_id: req.user.id,
+        actor_type: 'USER',
+        action: 'DEVICE_MALFUNCTION_REPORTED',
+        target_type: 'Device',
+        target_id: id,
+        meta: {
+          note: note.trim(),
+          deviceName: device.device_name,
+          deviceCode: device.device_code,
+          reporterName: req.user.name,
+          reporterRole: req.user.role,
+          reporterEmail: req.user.email,
+        },
+      },
+    });
+
+    // Notify Super Admin room
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin:global').emit('device:malfunction', {
+        deviceId: id,
+        deviceCode: device.device_code,
+        deviceName: device.device_name,
+        note: note.trim(),
+        reportedBy: req.user.name,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: 'Malfunction report submitted to Super Admin successfully',
+      reportId: audit.id,
+    });
+  } catch (error) {
+    console.error('Report malfunction error:', error);
+    return res.status(500).json({ error: 'Internal server error reporting malfunction' });
+  }
+}
+

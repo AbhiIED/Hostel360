@@ -20,6 +20,7 @@ interface CurfewWindow {
   start_time: string;
   end_time: string;
   grace_period_minutes: number;
+  max_low_risk_hours?: number;
   is_active: boolean;
   hostel?: {
     id: string;
@@ -56,6 +57,7 @@ export const CurfewManagementPage: React.FC = () => {
     start_time: '21:00',
     end_time: '06:00',
     grace_period_minutes: 30,
+    max_low_risk_hours: 8,
     is_active: true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +92,7 @@ export const CurfewManagementPage: React.FC = () => {
       start_time: '21:00',
       end_time: '06:00',
       grace_period_minutes: 30,
+      max_low_risk_hours: 8,
       is_active: true,
     });
     setModalOpen(true);
@@ -103,6 +106,7 @@ export const CurfewManagementPage: React.FC = () => {
       start_time: win.start_time.slice(0, 5),
       end_time: win.end_time.slice(0, 5),
       grace_period_minutes: win.grace_period_minutes,
+      max_low_risk_hours: win.max_low_risk_hours ?? 8,
       is_active: win.is_active,
     });
     setModalOpen(true);
@@ -130,6 +134,7 @@ export const CurfewManagementPage: React.FC = () => {
       start_time: formData.start_time,
       end_time: formData.end_time,
       grace_period_minutes: Number(formData.grace_period_minutes),
+      max_low_risk_hours: Number(formData.max_low_risk_hours || 8),
       is_active: formData.is_active,
     };
 
@@ -259,6 +264,7 @@ export const CurfewManagementPage: React.FC = () => {
                   <th className="py-2.5 font-medium">Applicability</th>
                   <th className="py-2.5 font-medium">Curfew Hours</th>
                   <th className="py-2.5 font-medium">Grace Period</th>
+                  <th className="py-2.5 font-medium">Low-Risk Cap</th>
                   <th className="py-2.5 font-medium">Status</th>
                   <th className="py-2.5 font-medium text-right">Actions</th>
                 </tr>
@@ -311,6 +317,10 @@ export const CurfewManagementPage: React.FC = () => {
 
                       <td className="py-3 font-mono text-[#5B6472] tabular-nums">
                         {win.grace_period_minutes} minutes
+                      </td>
+
+                      <td className="py-3 font-mono text-[#5B6472] tabular-nums">
+                        {win.max_low_risk_hours ?? 8} hours
                       </td>
 
                       <td className="py-3">
@@ -454,17 +464,35 @@ export const CurfewManagementPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="pt-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="rounded border-[#E4E1DA] text-[#26415C]"
-                    />
-                    <span className="font-medium text-[#1C2430]">Rule is Active</span>
+                <div>
+                  <label className="block font-medium text-[#1C2430] mb-1">
+                    Low-Risk Threshold (Hours)
                   </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={72}
+                    required
+                    value={formData.max_low_risk_hours}
+                    onChange={(e) => setFormData({ ...formData, max_low_risk_hours: Number(e.target.value) })}
+                    className="w-full p-2 border border-[#E4E1DA] rounded font-mono text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                  />
                 </div>
+              </div>
+              <p className="text-[11px] text-[#5B6472]">
+                Leave requests exceeding this duration (default 8 hours) or overlapping curfew automatically escalate to HIGH risk tier (requiring Warden approval).
+              </p>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    className="rounded border-[#E4E1DA] text-[#26415C]"
+                  />
+                  <span className="font-medium text-[#1C2430]">Rule is Active</span>
+                </label>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-[#E4E1DA]">

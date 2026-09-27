@@ -6,23 +6,32 @@ import { createLogger, defineConfig } from 'vite'
 const logger = createLogger()
 const originalError = logger.error.bind(logger)
 
+const isBenignError = (err: any, msg?: string): boolean => {
+  const code = err?.code || ''
+  if (['ECONNABORTED', 'ECONNRESET', 'EPIPE', 'ECONNREFUSED'].includes(code)) {
+    return true
+  }
+  if (Array.isArray(err?.errors)) {
+    if (err.errors.some((e: any) => ['ECONNABORTED', 'ECONNRESET', 'EPIPE', 'ECONNREFUSED'].includes(e?.code))) {
+      return true
+    }
+  }
+  const str = `${msg || ''} ${err?.message || ''}`
+  return (
+    str.includes('ECONNABORTED') ||
+    str.includes('ECONNRESET') ||
+    str.includes('ECONNREFUSED') ||
+    str.includes('EPIPE') ||
+    str.includes('ws proxy socket error') ||
+    str.includes('ws proxy error')
+  )
+}
+
 logger.error = (msg, options) => {
   const err = options?.error as any
-  const errCode = err?.code || ''
-  const isBenignDisconnect =
-    errCode === 'ECONNABORTED' ||
-    errCode === 'ECONNRESET' ||
-    errCode === 'EPIPE' ||
-    (typeof msg === 'string' &&
-      (msg.includes('ECONNABORTED') ||
-        msg.includes('ECONNRESET') ||
-        msg.includes('ws proxy socket error') ||
-        msg.includes('ws proxy error')))
-
-  if (isBenignDisconnect) {
+  if (isBenignError(err, typeof msg === 'string' ? msg : undefined)) {
     return
   }
-
   originalError(msg, options)
 }
 
@@ -34,15 +43,23 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err: any) => {
+            if (isBenignError(err)) {
+              return
+            }
+            console.error('[vite api proxy error]', err.message || err)
+          })
+        },
       },
       '/socket.io': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         ws: true,
         configure: (proxy) => {
           proxy.on('error', (err: any) => {
-            if (['ECONNABORTED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+            if (isBenignError(err)) {
               return
             }
             console.error('[vite ws proxy error]', err.message || err)

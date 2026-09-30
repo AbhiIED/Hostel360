@@ -17,12 +17,14 @@ import {
   TrendingUp,
   LayoutDashboard,
   ShieldAlert,
+  Users,
 } from 'lucide-react';
 import CurfewAlertsPanel from '../components/CurfewAlertsPanel';
 import LeaveRequestsPanel from '../components/LeaveRequestsPanel';
 import MyKiosksPanel from '../components/MyKiosksPanel';
 import AllocationReviewPanel from '../components/AllocationReviewPanel';
 import RoomSwapPanel from '../components/RoomSwapPanel';
+import WardenTeamPanel from '../components/WardenTeamPanel';
 
 export const DashboardHubPage: React.FC = () => {
   const { user } = useAuth();
@@ -663,6 +665,9 @@ export const DashboardHubPage: React.FC = () => {
 
             {/* Mutual Room Swap Requests (Cross-Tier Exceptions) */}
             <RoomSwapPanel hostelId={selectedHostelId || assignedHostel?.id} />
+
+            {/* My Team Management (Vice Warden & Caretaker Oversight) */}
+            <WardenTeamPanel hostelId={selectedHostelId || assignedHostel?.id} />
           </main>
         </div>
       </div>
@@ -717,6 +722,13 @@ export const DashboardHubPage: React.FC = () => {
             >
               <Laptop className="w-4 h-4" strokeWidth={1.5} />
               <span>Hardware kiosks</span>
+            </Link>
+            <Link
+              to="/dashboard/staff"
+              className="flex items-center gap-2.5 px-3 py-2 rounded text-xs text-[#5B6472] hover:text-[#1C2430] hover:bg-white transition"
+            >
+              <Users className="w-4 h-4" strokeWidth={1.5} />
+              <span>Staff provisioning</span>
             </Link>
             <Link
               to="/dashboard/curfew"

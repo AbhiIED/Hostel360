@@ -25,6 +25,8 @@ import { DashboardHubPage } from './pages/DashboardHubPage';
 import { AttendanceHistoryPage } from './pages/AttendanceHistoryPage';
 import { AnalyticsReportsPage } from './pages/AnalyticsReportsPage';
 import { CurfewManagementPage } from './pages/CurfewManagementPage';
+import { StaffProvisioningPage } from './pages/StaffProvisioningPage';
+import { AcceptInvitePage } from './pages/AcceptInvitePage';
 
 const HomeView = () => {
   const { user, isAuthenticated } = useAuth();
@@ -240,11 +242,20 @@ export default function App() {
               />
               <Route path="/display/gate/:deviceId" element={<KioskDisplayPage />} />
               <Route path="/display/mess/:deviceId" element={<KioskDisplayPage />} />
+              <Route path="/accept-invite" element={<AcceptInvitePage />} />
               <Route
                 path="/dashboard/devices"
                 element={
                   <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
                     <DeviceManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard/staff"
+                element={
+                  <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                    <StaffProvisioningPage />
                   </ProtectedRoute>
                 }
               />

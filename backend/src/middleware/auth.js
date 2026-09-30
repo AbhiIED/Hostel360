@@ -29,9 +29,11 @@ export async function authenticate(req, res, next) {
           },
         },
         staff_hostel_assignments: {
+          where: { end_date: null },
           include: { hostel: true },
         },
         staff_mess_assignments: {
+          where: { end_date: null },
           include: { mess: true },
         },
       },
@@ -39,6 +41,16 @@ export async function authenticate(req, res, next) {
 
     if (!user || !user.is_active) {
       return res.status(401).json({ error: 'User account is inactive or not found' });
+    }
+
+    if (['WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN'].includes(user.role)) {
+      const activeCount = (user.staff_hostel_assignments?.length || 0) + (user.staff_mess_assignments?.length || 0);
+      if (activeCount === 0) {
+        return res.status(403).json({
+          error: 'Access denied: Staff account has no currently active assignments across the campus.',
+          code: 'NO_ACTIVE_ASSIGNMENT',
+        });
+      }
     }
 
     req.user = user;

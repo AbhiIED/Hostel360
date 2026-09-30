@@ -49,6 +49,19 @@ export async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (['WARDEN', 'VICE_WARDEN', 'CARETAKER', 'MESS_ADMIN'].includes(user.role)) {
+      const [hostelActive, messActive] = await Promise.all([
+        prisma.staffHostelAssignment.count({ where: { user_id: user.id, end_date: null } }),
+        prisma.staffMessAssignment.count({ where: { user_id: user.id, end_date: null } }),
+      ]);
+      if (hostelActive + messActive === 0) {
+        return res.status(403).json({
+          error: 'Access denied: Staff account has no currently active assignments across the campus.',
+          code: 'NO_ACTIVE_ASSIGNMENT',
+        });
+      }
+    }
+
     const accessToken = generateAccessToken(user);
     const rawRefreshToken = generateRefreshToken();
     const tokenHash = hashToken(rawRefreshToken);

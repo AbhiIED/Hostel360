@@ -15,6 +15,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import curfewRoutes from './routes/curfewRoutes.js';
 import allocationRoutes from './routes/allocationRoutes.js';
+import staffRoutes from './routes/staffRoutes.js';
 import { startTokenSweeper } from './services/sweeper.js';
 import { startCurfewScheduler } from './services/curfewScheduler.js';
 import prisma from './prisma.js';
@@ -115,6 +116,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/curfew', curfewRoutes);
 app.use('/api/allocations', allocationRoutes);
+app.use('/api/staff', staffRoutes);
 
 // Default 404 handler for unmatched API routes
 app.use('/api', (req, res) => {

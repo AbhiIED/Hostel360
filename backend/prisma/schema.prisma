@@ -148,10 +148,26 @@ enum SwapStatus {
   CANCELLED
 }
 
+enum NominationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 model User {
   id            String         @id @default(uuid())
   name          String         @db.VarChar(120)
   email         String         @unique @db.VarChar(255)
+  phone         String?        @db.VarChar(30)
+  employee_id   String?        @db.VarChar(60)
   password_hash String         @db.VarChar(255)
   role          Role
   is_active     Boolean        @default(true)
@@ -171,6 +187,14 @@ model User {
   executed_allocation_batches  AllocationBatch[]       @relation("BatchExecutor")
   confirmed_allocations        RoomAllocation[]        @relation("AllocationConfirmer")
   decided_swaps                RoomSwapRequest[]       @relation("SwapDecider")
+  nominations_created          StaffNomination[]       @relation("WardenNominations")
+  nominations_reviewed         StaffNomination[]       @relation("NominationReviewer")
+  created_staff_invites        StaffInvite[]           @relation("CreatedStaffInvites")
+  accepted_staff_invites       StaffInvite[]           @relation("AcceptedStaffInvite")
+  hostel_assignments_given     StaffHostelAssignment[] @relation("HostelAssignmentAssignedBy")
+  hostel_assignments_ended     StaffHostelAssignment[] @relation("HostelAssignmentEndedBy")
+  mess_assignments_given       StaffMessAssignment[]   @relation("MessAssignmentAssignedBy")
+  mess_assignments_ended       StaffMessAssignment[]   @relation("MessAssignmentEndedBy")
 
   @@map("users")
 }
@@ -233,6 +257,7 @@ model Hostel {
   redirected_applications  HostelApplication[]    @relation("RedirectedApplications")
   allocation_batches       AllocationBatch[]
   room_allocations         RoomAllocation[]
+  staff_nominations        StaffNomination[]
 
   @@map("hostels")
 }
@@ -426,31 +451,45 @@ model AuditLog {
 // --- Staff Assignment Tables ---
 
 model StaffHostelAssignment {
-  id          String   @id @default(uuid())
-  user_id     String
-  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  hostel_id   String
-  hostel      Hostel   @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
-  role        Role
-  is_primary  Boolean  @default(false)
-  assigned_at DateTime @default(now())
+  id               String    @id @default(uuid())
+  user_id          String
+  user             User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  hostel_id        String
+  hostel           Hostel    @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  role             Role
+  is_primary       Boolean   @default(false)
+  assigned_at      DateTime  @default(now())
+  assigned_by      String?
+  assigned_by_user User?     @relation("HostelAssignmentAssignedBy", fields: [assigned_by], references: [id], onDelete: SetNull)
+  end_date         DateTime?
+  ended_by         String?
+  ended_by_user    User?     @relation("HostelAssignmentEndedBy", fields: [ended_by], references: [id], onDelete: SetNull)
+  end_reason       String?   @db.Text
 
   @@unique([user_id, hostel_id])
   @@index([hostel_id])
+  @@index([end_date])
   @@map("staff_hostel_assignments")
 }
 
 model StaffMessAssignment {
-  id          String   @id @default(uuid())
-  user_id     String
-  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  mess_id     String
-  mess        Mess     @relation(fields: [mess_id], references: [id], onDelete: Cascade)
-  role        Role
-  assigned_at DateTime @default(now())
+  id               String    @id @default(uuid())
+  user_id          String
+  user             User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  mess_id          String
+  mess             Mess      @relation(fields: [mess_id], references: [id], onDelete: Cascade)
+  role             Role
+  assigned_at      DateTime  @default(now())
+  assigned_by      String?
+  assigned_by_user User?     @relation("MessAssignmentAssignedBy", fields: [assigned_by], references: [id], onDelete: SetNull)
+  end_date         DateTime?
+  ended_by         String?
+  ended_by_user    User?     @relation("MessAssignmentEndedBy", fields: [ended_by], references: [id], onDelete: SetNull)
+  end_reason       String?   @db.Text
 
   @@unique([user_id, mess_id])
   @@index([mess_id])
+  @@index([end_date])
   @@map("staff_mess_assignments")
 }
 
@@ -690,4 +729,60 @@ model RoomSwapRequest {
   @@index([target_student_id, status])
   @@map("room_swap_requests")
 }
+
+model StaffNomination {
+  id           String           @id @default(uuid())
+  nominated_by String
+  nominator    User             @relation("WardenNominations", fields: [nominated_by], references: [id], onDelete: Cascade)
+  hostel_id    String
+  hostel       Hostel           @relation(fields: [hostel_id], references: [id], onDelete: Cascade)
+  role         Role
+  name         String           @db.VarChar(120)
+  email        String           @db.VarChar(255)
+  phone        String?          @db.VarChar(30)
+  employee_id  String           @db.VarChar(60)
+  status       NominationStatus @default(PENDING)
+  reviewed_by  String?
+  reviewer     User?            @relation("NominationReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  reviewed_at  DateTime?
+  review_note  String?          @db.Text
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+
+  invite       StaffInvite?
+
+  @@index([nominated_by])
+  @@index([hostel_id])
+  @@index([status])
+  @@map("staff_nominations")
+}
+
+model StaffInvite {
+  id                   String           @id @default(uuid())
+  source_nomination_id String?          @unique
+  source_nomination    StaffNomination? @relation(fields: [source_nomination_id], references: [id], onDelete: SetNull)
+  created_by           String
+  creator              User             @relation("CreatedStaffInvites", fields: [created_by], references: [id], onDelete: Cascade)
+  role                 Role
+  name                 String           @db.VarChar(120)
+  email                String           @db.VarChar(255)
+  phone                String?          @db.VarChar(30)
+  employee_id          String           @db.VarChar(60)
+  token_hash           String           @unique @db.VarChar(255)
+  expires_at           DateTime
+  status               InviteStatus     @default(PENDING)
+  target_hostel_ids    Json?
+  target_mess_ids      Json?
+  accepted_user_id     String?
+  accepted_user        User?            @relation("AcceptedStaffInvite", fields: [accepted_user_id], references: [id], onDelete: SetNull)
+  accepted_at          DateTime?
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([expires_at])
+  @@map("staff_invites")
+}
+
 

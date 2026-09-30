@@ -11,6 +11,7 @@ import {
   History,
   TrendingUp,
   ShieldAlert,
+  Users,
 } from 'lucide-react';
 
 export const DashboardNav: React.FC = () => {
@@ -56,6 +57,12 @@ export const DashboardNav: React.FC = () => {
       label: 'Hardware kiosks',
       path: '/dashboard/devices',
       icon: Laptop,
+      roles: ['SUPER_ADMIN'],
+    },
+    {
+      label: 'Staff provisioning',
+      path: '/dashboard/staff',
+      icon: Users,
       roles: ['SUPER_ADMIN'],
     },
     {

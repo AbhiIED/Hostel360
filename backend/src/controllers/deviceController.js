@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
+import { generateQrToken } from '../services/qrTokenService.js';
 
 // 3.1 Device registration endpoint
 export async function registerDevice(req, res) {
@@ -100,8 +101,9 @@ export async function listDevices(req, res) {
           select: {
             id: true,
             name: true,
+            hostel_id: true,
             hostel: {
-              select: { id: true, name: true, code: true },
+              select: { id: true, name: true, code: true, type: true },
             },
           },
         },
@@ -109,6 +111,10 @@ export async function listDevices(req, res) {
           select: {
             id: true,
             name: true,
+            hostel_id: true,
+            hostel: {
+              select: { id: true, name: true, code: true, type: true },
+            },
           },
         },
         registrant: {
@@ -454,4 +460,79 @@ export async function reportMalfunction(req, res) {
     return res.status(500).json({ error: 'Internal server error reporting malfunction' });
   }
 }
+
+/**
+ * GET or POST /api/devices/:id/qr-token
+ * Authenticated staff / Super Admin endpoint.
+ * Fetches or generates the real-time dynamic QR token for a kiosk display.
+ * Allows dashboard view to render live QR codes without needing raw device secrets.
+ */
+export async function getDeviceQrToken(req, res) {
+  try {
+    const { id } = req.params;
+
+    const device = await prisma.device.findFirst({
+      where: {
+        OR: [{ id }, { device_code: id }],
+      },
+      include: {
+        gate: { include: { hostel: true } },
+        mess: { include: { hostel: true } },
+      },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    if (!device.is_active) {
+      return res.status(403).json({ error: 'This display device has been disabled' });
+    }
+
+    // Role-based scoping check for non-Super Admin users
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const assignedHostelIds = req.user.staff_hostel_assignments?.map((a) => a.hostel_id) || [];
+      const assignedMessIds = req.user.staff_mess_assignments?.map((a) => a.mess_id) || [];
+
+      const matchesHostel = device.gate?.hostel_id && assignedHostelIds.includes(device.gate.hostel_id);
+      const matchesMessHostel = device.mess?.hostel_id && assignedHostelIds.includes(device.mess.hostel_id);
+      const matchesMess = device.mess_id && assignedMessIds.includes(device.mess_id);
+
+      if (!matchesHostel && !matchesMessHostel && !matchesMess) {
+        return res.status(403).json({ error: 'You do not have permission to view QR tokens for this device' });
+      }
+    }
+
+    // Generate real-time dynamic QR token
+    const tokenResult = await generateQrToken(device);
+
+    // Update heartbeat asynchronously
+    prisma.device.update({
+      where: { id: device.id },
+      data: { last_heartbeat_at: new Date() },
+    }).catch((err) => console.error('Failed to touch heartbeat during QR retrieval:', err));
+
+    return res.status(200).json({
+      token: tokenResult.token,
+      expires_at: tokenResult.expires_at,
+      ttl: tokenResult.ttl,
+      purpose: device.purpose,
+      device: {
+        id: device.id,
+        device_code: device.device_code,
+        device_name: device.device_name,
+        purpose: device.purpose,
+        gate: tokenResult.record.gate,
+        mess: tokenResult.record.mess,
+      },
+      meal_window: tokenResult.meal_window,
+      next_meal_window: tokenResult.next_meal_window,
+      all_meal_windows: tokenResult.all_meal_windows,
+    });
+  } catch (error) {
+    console.error('getDeviceQrToken error:', error);
+    return res.status(500).json({ error: 'Failed to retrieve QR token for device' });
+  }
+}
+
 

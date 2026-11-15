@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Lock, Mail, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 
@@ -145,6 +145,21 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* New Student Registration Link */}
+          <div className="mt-5 p-3 rounded-lg bg-[#FAF9F6] border border-[#E4E1DA] flex items-center justify-between text-xs">
+            <div>
+              <div className="font-semibold text-[#1C2430]">New Student Admission?</div>
+              <div className="text-[11px] text-[#5B6472]">Register & enter hostel room lottery</div>
+            </div>
+            <Link
+              to="/register"
+              className="py-1.5 px-3 rounded bg-[#26415C] text-white hover:bg-[#1e344a] transition font-medium text-xs flex items-center gap-1"
+            >
+              <span>Register</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
 
           <div className="mt-6 pt-5 border-t border-[#E4E1DA]">
             <p className="text-xs text-[#5B6472] mb-3 text-center">

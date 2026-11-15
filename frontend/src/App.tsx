@@ -15,6 +15,7 @@ import { Header } from './components/Header';
 import { DashboardNav } from './components/DashboardNav';
 import { Footer } from './components/Footer';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { DeviceManagementPage } from './pages/DeviceManagementPage';
 import { HostelRoomManagementPage } from './pages/HostelRoomManagementPage';
 import { StudentManagementPage } from './pages/StudentManagementPage';
@@ -58,18 +59,17 @@ const HomeView = () => {
         {/* Action buttons for visitors */}
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
           <Link
-            to="/login"
-            className="px-5 py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs flex items-center gap-2 transition"
+            to="/register"
+            className="px-5 py-2.5 rounded bg-[#26415C] hover:bg-[#1e344a] text-white font-medium text-xs flex items-center gap-2 transition shadow-sm"
           >
-            <span>Staff and warden sign in</span>
+            <span>Student Registration & Room Lottery</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
           <Link
-            to="/app"
+            to="/login"
             className="px-5 py-2.5 rounded bg-white hover:bg-[#FAF9F6] text-[#1C2430] font-medium text-xs border border-[#E4E1DA] flex items-center gap-2 transition"
           >
-            <UserCheck className="w-3.5 h-3.5 text-[#26415C]" />
-            <span>Student mobile scanner</span>
+            <span>Staff & Student Sign in</span>
           </Link>
         </div>
       </div>
@@ -220,6 +220,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomeView />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route path="/caretaker" element={<Navigate to="/dashboard" replace />} />
               <Route path="/warden" element={<Navigate to="/dashboard" replace />} />
               <Route path="/mess" element={<Navigate to="/dashboard" replace />} />

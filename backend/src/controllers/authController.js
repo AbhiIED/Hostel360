@@ -16,6 +16,19 @@ const logoutSchema = z.object({
   refreshToken: z.string().optional(),
 });
 
+const registerStudentSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(120),
+  email: z.string().trim().email('Invalid college email address').max(255),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  roll_number: z.string().trim().min(2, 'Roll / Scholar number is required').max(30),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
+  department: z.string().trim().min(2, 'Department is required').max(50),
+  year: z.coerce.number().int().min(1).max(5),
+  hostel_id: z.string().uuid('Please select a valid hostel'),
+  accessibility_needs: z.boolean().optional().default(false),
+  accessibility_details: z.string().max(500).optional().nullable(),
+});
+
 export async function login(req, res) {
   try {
     const parsed = loginSchema.safeParse(req.body);
@@ -223,5 +236,262 @@ export async function getMe(req, res) {
     return res.json({ user: req.user });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+}
+
+/**
+ * Public endpoint: Returns available hostels and active admission windows for student registration.
+ */
+export async function getRegistrationOptions(req, res) {
+  try {
+    const hostels = await prisma.hostel.findMany({
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        type: true,
+        location: true,
+        total_capacity: true,
+        has_blocks: true,
+        _count: {
+          select: { students: true, rooms: true },
+        },
+      },
+      orderBy: { code: 'asc' },
+    });
+
+    const activeWindows = await prisma.registrationWindow.findMany({
+      where: { status: 'OPEN' },
+      select: {
+        id: true,
+        academic_year: true,
+        semester: true,
+        open_from: true,
+        open_to: true,
+        hostel_id: true,
+      },
+    });
+
+    const departments = [
+      'Computer Science & Engineering',
+      'Electronics & Communication Engineering',
+      'Electrical Engineering',
+      'Mechanical Engineering',
+      'Civil Engineering',
+      'Chemical Engineering',
+      'Materials & Metallurgical Engineering',
+      'Architecture & Planning',
+      'Master of Computer Applications (MCA)',
+      'Management Studies (MBA)',
+      'Applied Sciences & Humanities',
+    ];
+
+    return res.json({
+      hostels,
+      activeWindows,
+      departments,
+    });
+  } catch (error) {
+    console.error('getRegistrationOptions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch registration options' });
+  }
+}
+
+/**
+ * Public endpoint: Registers a student account and simultaneously enrolls them into the
+ * batch hostel room allocation lottery.
+ */
+export async function registerStudentWithLottery(req, res) {
+  try {
+    const parsed = registerStudentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const {
+      name,
+      email,
+      password,
+      roll_number,
+      gender,
+      department,
+      year,
+      hostel_id,
+      accessibility_needs,
+      accessibility_details,
+    } = parsed.data;
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedRoll = roll_number.toUpperCase().trim();
+
+    // 1. Check if email is already taken
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existingUser) {
+      return res.status(409).json({
+        error: 'An account with this email address already exists. Please sign in instead.',
+      });
+    }
+
+    // 2. Check if roll number is already registered
+    const existingStudent = await prisma.student.findUnique({
+      where: { roll_number: normalizedRoll },
+    });
+    if (existingStudent) {
+      return res.status(409).json({
+        error: 'A student with this Roll / Scholar number is already registered.',
+      });
+    }
+
+    // 3. Verify selected hostel
+    const targetHostel = await prisma.hostel.findUnique({
+      where: { id: hostel_id },
+    });
+    if (!targetHostel) {
+      return res.status(404).json({ error: 'Selected hostel was not found.' });
+    }
+
+    if (gender === 'MALE' && targetHostel.type === 'GIRLS') {
+      return res.status(400).json({ error: 'Male students cannot apply to a Girls hostel.' });
+    }
+    if (gender === 'FEMALE' && targetHostel.type === 'BOYS') {
+      return res.status(400).json({ error: 'Female students cannot apply to a Boys hostel.' });
+    }
+
+    // 4. Resolve or auto-create an OPEN registration window for the lottery
+    let window = await prisma.registrationWindow.findFirst({
+      where: {
+        status: 'OPEN',
+        OR: [{ hostel_id: null }, { hostel_id: targetHostel.id }],
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!window) {
+      const now = new Date();
+      const nextYear = new Date();
+      nextYear.setFullYear(now.getFullYear() + 1);
+
+      window = await prisma.registrationWindow.create({
+        data: {
+          hostel_id: null,
+          academic_year: `${now.getFullYear()}-${now.getFullYear() + 1}`,
+          semester: 1,
+          open_from: now,
+          open_to: nextYear,
+          status: 'OPEN',
+        },
+      });
+    }
+
+    // 5. Hash password
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    // 6. Execute atomic creation: User + Student + HostelApplication (Lottery Pool)
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name,
+          email: normalizedEmail,
+          password_hash,
+          role: 'STUDENT',
+          is_active: true,
+        },
+      });
+
+      const student = await tx.student.create({
+        data: {
+          user_id: user.id,
+          roll_number: normalizedRoll,
+          gender,
+          department,
+          year,
+          hostel_id: targetHostel.id,
+          room_id: null, // Room will be allocated via batch lottery
+          current_state: 'INSIDE',
+        },
+        include: {
+          hostel: {
+            select: { id: true, name: true, code: true, type: true },
+          },
+        },
+      });
+
+      const application = await tx.hostelApplication.create({
+        data: {
+          window_id: window.id,
+          student_id: student.id,
+          hostel_id: targetHostel.id,
+          year_of_study: year,
+          is_renewal: false,
+          accessibility_needs: Boolean(accessibility_needs),
+          accessibility_details: accessibility_details || null,
+          status: 'PENDING',
+        },
+        include: {
+          window: {
+            select: { id: true, academic_year: true, semester: true, status: true },
+          },
+          hostel: {
+            select: { id: true, name: true, code: true },
+          },
+        },
+      });
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          actor_id: user.id,
+          actor_type: 'USER',
+          action: 'STUDENT_REGISTRATION_AND_LOTTERY_APPLICATION',
+          target_type: 'Student',
+          target_id: student.id,
+          meta: {
+            hostel_code: targetHostel.code,
+            year,
+            accessibility: Boolean(accessibility_needs),
+          },
+        },
+      });
+
+      // Issue tokens
+      const accessToken = generateAccessToken(user);
+      const rawRefreshToken = generateRefreshToken();
+      const tokenHash = hashToken(rawRefreshToken);
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      await tx.refreshToken.create({
+        data: {
+          user_id: user.id,
+          token_hash: tokenHash,
+          expires_at: expiresAt,
+        },
+      });
+
+      return { user, student, application, accessToken, rawRefreshToken };
+    });
+
+    const { password_hash: _, ...safeUser } = result.user;
+
+    return res.status(201).json({
+      message: 'Registration successful! You have been entered into the hostel room lottery.',
+      accessToken: result.accessToken,
+      refreshToken: result.rawRefreshToken,
+      user: {
+        ...safeUser,
+        student: result.student,
+      },
+      application: result.application,
+    });
+  } catch (error) {
+    console.error('registerStudentWithLottery error:', error);
+    return res.status(500).json({ error: 'Internal server error during registration' });
   }
 }

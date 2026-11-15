@@ -36,11 +36,25 @@ export interface User {
   };
 }
 
+export interface RegisterStudentData {
+  name: string;
+  email: string;
+  password: string;
+  roll_number: string;
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  department: string;
+  year: number;
+  hostel_id: string;
+  accessibility_needs?: boolean;
+  accessibility_details?: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  registerStudent: (data: RegisterStudentData) => Promise<User>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -124,6 +138,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return loggedInUser;
   };
 
+  const registerStudent = async (data: RegisterStudentData): Promise<User> => {
+    const response = await api.post('/auth/register', data);
+    const { accessToken: newAccess, refreshToken: newRefresh, user: registeredUser } = response.data;
+
+    handleTokensUpdate(newAccess, newRefresh);
+    setUser(registeredUser);
+    return registeredUser;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -131,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         accessToken,
         isLoading,
         login,
+        registerStudent,
         logout,
         isAuthenticated: !!user,
       }}

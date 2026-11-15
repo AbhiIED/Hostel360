@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import api from '../api/client';
 import { getSocket } from '../api/socket';
 import type { Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -160,10 +161,10 @@ export const KioskDisplayPage: React.FC = () => {
     if (saved) {
       setDeviceSecret(saved);
       setSecretInput(saved);
-    } else {
+    } else if (!isAuthenticated) {
       setShowConfigModal(true);
     }
-  }, [deviceId, storageKey]);
+  }, [deviceId, storageKey, isAuthenticated]);
 
   // Fetch public device info
   const fetchDeviceInfo = useCallback(async () => {
@@ -187,19 +188,30 @@ export const KioskDisplayPage: React.FC = () => {
 
   // Fetch rotating QR token from backend
   const fetchNextQrToken = useCallback(async () => {
-    if (!deviceId || !deviceSecret) return;
+    if (!deviceId) return;
+    if (!deviceSecret && !isAuthenticated) {
+      setShowConfigModal(true);
+      return;
+    }
+
     setIsRotating(true);
     setErrorStatus(null);
 
     try {
-      const res = await axios.get<QrTokenResponse>('/api/display/qr', {
-        headers: {
-          Authorization: `Bearer ${deviceSecret}`,
-          'x-device-id': deviceId,
-        },
-      });
+      let data: QrTokenResponse;
+      if (deviceSecret) {
+        const res = await axios.get<QrTokenResponse>('/api/display/qr', {
+          headers: {
+            Authorization: `Bearer ${deviceSecret}`,
+            'x-device-id': deviceId,
+          },
+        });
+        data = res.data;
+      } else {
+        const res = await api.get<QrTokenResponse>(`/devices/${deviceId}/qr-token`);
+        data = res.data;
+      }
 
-      const data = res.data;
       setQrToken(data.token);
       setMealWindow(data.meal_window || null);
       setNextMealWindow(data.next_meal_window || null);
@@ -228,7 +240,7 @@ export const KioskDisplayPage: React.FC = () => {
     } finally {
       setIsRotating(false);
     }
-  }, [deviceId, deviceSecret]);
+  }, [deviceId, deviceSecret, isAuthenticated]);
 
   // Countdown timer effect
   useEffect(() => {

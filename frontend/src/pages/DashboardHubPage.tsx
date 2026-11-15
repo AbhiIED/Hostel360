@@ -958,15 +958,17 @@ export const DashboardHubPage: React.FC = () => {
                   </table>
                 </div>
               </div>
+            </div>
 
-              {/* Curfew Alerts & Out-Pass Monitoring */}
+            {/* Curfew Alerts & Out-Pass Monitoring */}
+            <div className="space-y-6">
               <CurfewAlertsPanel showAllHostels={true} />
               <LeaveRequestsPanel showAllHostels={true} />
+            </div>
 
-              {/* Batch Room Allocation Review */}
+            {/* Batch Room Allocation Review & Mutual Room Swapping */}
+            <div className="space-y-6">
               <AllocationReviewPanel />
-
-              {/* Mutual Room Swap Requests */}
               <RoomSwapPanel />
             </div>
           </main>

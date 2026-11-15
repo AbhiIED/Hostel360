@@ -6,6 +6,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "build": "prisma generate",
+    "db:deploy": "prisma db push && node scripts/register_all_hostel_kiosks.js",
     "dev": "nodemon src/index.js",
     "seed": "node prisma/seed.js",
     "test": "node --test --test-concurrency=1 tests/**/*.test.js"

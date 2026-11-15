@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import api from '../api/client';
 import { getSocket } from '../api/socket';
 import type { Socket } from 'socket.io-client';
@@ -170,7 +169,7 @@ export const KioskDisplayPage: React.FC = () => {
   const fetchDeviceInfo = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const res = await axios.get(`/api/display/info/${deviceId}`);
+      const res = await api.get(`/display/info/${deviceId}`);
       setDeviceInfo(res.data.device);
       if (res.data.meal_status) {
         setMealWindow(res.data.meal_status.active || null);
@@ -200,7 +199,7 @@ export const KioskDisplayPage: React.FC = () => {
     try {
       let data: QrTokenResponse;
       if (deviceSecret) {
-        const res = await axios.get<QrTokenResponse>('/api/display/qr', {
+        const res = await api.get<QrTokenResponse>('/display/qr', {
           headers: {
             Authorization: `Bearer ${deviceSecret}`,
             'x-device-id': deviceId,

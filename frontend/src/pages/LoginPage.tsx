@@ -3,32 +3,49 @@ import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Lock, Mail, AlertCircle, Loader2, ArrowRight, Building, Check } from 'lucide-react';
 
-interface WardenPreset {
+interface StaffPreset {
   code: string;
   hostelName: string;
   name: string;
   email: string;
+  role: 'WARDEN' | 'CARETAKER';
 }
 
-const ALL_WARDEN_PRESETS: WardenPreset[] = [
-  { code: 'H1', hostelName: 'Homi Bhabha Bhawan (Boys)', name: 'Dr. A. K. Sharma', email: 'warden.h1@hostel360.com' },
-  { code: 'H2', hostelName: 'Vikram Sarabhai Bhawan (Boys)', name: 'Dr. S. K. Gupta', email: 'warden.h2@hostel360.com' },
-  { code: 'H3', hostelName: 'Hostel No. 3 (Boys)', name: 'Dr. Manoj Kumar', email: 'warden.h3@hostel360.com' },
-  { code: 'H4', hostelName: 'Hostel No. 4 (Boys)', name: 'Dr. R. K. Singh', email: 'warden.h4@hostel360.com' },
-  { code: 'H5', hostelName: 'M. Visvesvarayya Bhawan (Boys)', name: 'Dr. V. K. Verma', email: 'warden.h5@hostel360.com' },
-  { code: 'H6', hostelName: 'J. C. Bose Bhawan (Boys)', name: 'Dr. Amit Joshi', email: 'warden.h6@hostel360.com' },
-  { code: 'H7', hostelName: 'Kalpana Chawla Bhawan (Girls)', name: 'Dr. Sunita Patel', email: 'warden.h7@hostel360.com' },
-  { code: 'H8', hostelName: 'Ramanujan Bhawan (Boys)', name: 'Dr. Neeraj Jain', email: 'warden.h8@hostel360.com' },
-  { code: 'H9', hostelName: 'Raja Ramanna Bhawan (Boys)', name: 'Dr. Sanjay Tiwari', email: 'warden.h9@hostel360.com' },
-  { code: 'H10', hostelName: 'Dr. APJ Abdul Kalam Mega (Boys)', name: 'Dr. D. K. Agarwal', email: 'warden.h10@hostel360.com' },
-  { code: 'H11', hostelName: 'Appu Bhavan (Boys/PhD)', name: 'Dr. Alok Tripathi', email: 'warden.h11@hostel360.com' },
-  { code: 'H12', hostelName: 'Bhagini Nivedita Bhawan (Girls)', name: 'Dr. Priya Sharma', email: 'warden.h12@hostel360.com' },
+const ALL_CARETAKER_PRESETS: StaffPreset[] = [
+  { code: 'H1', hostelName: 'Homi Jehangir Bhabha Bhawan (Boys)', name: 'Shri Ram Prasad', email: 'caretaker.h1@hostel360.com', role: 'CARETAKER' },
+  { code: 'H2', hostelName: 'Vikram Sarabhai Bhawan (Boys)', name: 'Shri Ramesh Kumar', email: 'caretaker.h2@hostel360.com', role: 'CARETAKER' },
+  { code: 'H3', hostelName: 'Hostel No. 3 (Boys)', name: 'Shri Suresh Chandra', email: 'caretaker.h3@hostel360.com', role: 'CARETAKER' },
+  { code: 'H4', hostelName: 'Hostel No. 4 (Boys)', name: 'Shri Dinesh Sharma', email: 'caretaker.h4@hostel360.com', role: 'CARETAKER' },
+  { code: 'H5', hostelName: 'M. Visvesvarayya Bhawan (Boys)', name: 'Shri Mohan Lal', email: 'caretaker.h5@hostel360.com', role: 'CARETAKER' },
+  { code: 'H6', hostelName: 'J. C. Bose Bhawan (Boys)', name: 'Shri Prakash Yadav', email: 'caretaker.h6@hostel360.com', role: 'CARETAKER' },
+  { code: 'H7', hostelName: 'Kalpana Chawla Bhawan (Girls)', name: 'Smt. Anita Bai', email: 'caretaker.h7@hostel360.com', role: 'CARETAKER' },
+  { code: 'H8', hostelName: 'Ramanujan Bhawan (Boys)', name: 'Shri Vinod Verma', email: 'caretaker.h8@hostel360.com', role: 'CARETAKER' },
+  { code: 'H9', hostelName: 'Raja Ramanna Bhawan (Boys)', name: 'Shri Santosh Meena', email: 'caretaker.h9@hostel360.com', role: 'CARETAKER' },
+  { code: 'H10', hostelName: 'Dr. APJ Abdul Kalam Bhawan (Boys)', name: 'Shri Kamal Singh', email: 'caretaker.h10@hostel360.com', role: 'CARETAKER' },
+  { code: 'H11', hostelName: 'Appu Bhavan (Boys/PhD)', name: 'Shri Jagdish Rathore', email: 'caretaker.h11@hostel360.com', role: 'CARETAKER' },
+  { code: 'H12', hostelName: 'Bhagini Nivedita Bhawan (Girls)', name: 'Smt. Geeta Devi', email: 'caretaker.h12@hostel360.com', role: 'CARETAKER' },
+];
+
+const ALL_WARDEN_PRESETS: StaffPreset[] = [
+  { code: 'H1', hostelName: 'Homi Bhabha Bhawan (Boys)', name: 'Dr. A. K. Sharma', email: 'warden.h1@hostel360.com', role: 'WARDEN' },
+  { code: 'H2', hostelName: 'Vikram Sarabhai Bhawan (Boys)', name: 'Dr. S. K. Gupta', email: 'warden.h2@hostel360.com', role: 'WARDEN' },
+  { code: 'H3', hostelName: 'Hostel No. 3 (Boys)', name: 'Dr. Manoj Kumar', email: 'warden.h3@hostel360.com', role: 'WARDEN' },
+  { code: 'H4', hostelName: 'Hostel No. 4 (Boys)', name: 'Dr. R. K. Singh', email: 'warden.h4@hostel360.com', role: 'WARDEN' },
+  { code: 'H5', hostelName: 'M. Visvesvarayya Bhawan (Boys)', name: 'Dr. V. K. Verma', email: 'warden.h5@hostel360.com', role: 'WARDEN' },
+  { code: 'H6', hostelName: 'J. C. Bose Bhawan (Boys)', name: 'Dr. Amit Joshi', email: 'warden.h6@hostel360.com', role: 'WARDEN' },
+  { code: 'H7', hostelName: 'Kalpana Chawla Bhawan (Girls)', name: 'Dr. Sunita Patel', email: 'warden.h7@hostel360.com', role: 'WARDEN' },
+  { code: 'H8', hostelName: 'Ramanujan Bhawan (Boys)', name: 'Dr. Neeraj Jain', email: 'warden.h8@hostel360.com', role: 'WARDEN' },
+  { code: 'H9', hostelName: 'Raja Ramanna Bhawan (Boys)', name: 'Dr. Sanjay Tiwari', email: 'warden.h9@hostel360.com', role: 'WARDEN' },
+  { code: 'H10', hostelName: 'Dr. APJ Abdul Kalam Mega (Boys)', name: 'Dr. D. K. Agarwal', email: 'warden.h10@hostel360.com', role: 'WARDEN' },
+  { code: 'H11', hostelName: 'Appu Bhavan (Boys/PhD)', name: 'Dr. Alok Tripathi', email: 'warden.h11@hostel360.com', role: 'WARDEN' },
+  { code: 'H12', hostelName: 'Bhagini Nivedita Bhawan (Girls)', name: 'Dr. Priya Sharma', email: 'warden.h12@hostel360.com', role: 'WARDEN' },
 ];
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedWardenEmail, setSelectedWardenEmail] = useState('');
+  const [selectedStaffEmail, setSelectedStaffEmail] = useState('');
+  const [staffRoleFilter, setStaffRoleFilter] = useState<'ALL' | 'CARETAKER' | 'WARDEN'>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,14 +53,18 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleWardenSelect = (wardenEmail: string) => {
-    setSelectedWardenEmail(wardenEmail);
-    if (wardenEmail) {
-      setEmail(wardenEmail);
+  const handleStaffSelect = (staffEmail: string) => {
+    setSelectedStaffEmail(staffEmail);
+    if (staffEmail) {
+      setEmail(staffEmail);
       setPassword('password123');
       setError(null);
     }
   };
+
+  const selectedStaffObj = [...ALL_CARETAKER_PRESETS, ...ALL_WARDEN_PRESETS].find(
+    (s) => s.email === selectedStaffEmail
+  );
 
   // If already authenticated, redirect straight to their role console
   if (isAuthenticated && user) {
@@ -124,35 +145,89 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Dedicated Hostel Warden Dropdown */}
+          {/* Dedicated Hostel Staff Dropdown (Wardens & Caretakers for all 12 Hostels) */}
           <div className="mb-5 p-3.5 rounded-lg bg-[#FAF9F6] border border-[#E4E1DA]">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-[#1C2430] flex items-center gap-1.5">
                 <Building className="w-3.5 h-3.5 text-[#26415C]" />
-                <span>Hostel Warden Quick Sign-In</span>
+                <span>Hostel Staff Quick Sign-In</span>
               </label>
-              <span className="text-[10px] text-[#26415C] font-mono bg-white px-2 py-0.5 rounded border border-[#E4E1DA]">
-                H1 to H12
-              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setStaffRoleFilter('ALL')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition ${
+                    staffRoleFilter === 'ALL'
+                      ? 'bg-[#26415C] text-white'
+                      : 'bg-white text-[#5B6472] border border-[#E4E1DA]'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStaffRoleFilter('CARETAKER')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition ${
+                    staffRoleFilter === 'CARETAKER'
+                      ? 'bg-[#26415C] text-white'
+                      : 'bg-white text-[#5B6472] border border-[#E4E1DA]'
+                  }`}
+                >
+                  Caretakers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStaffRoleFilter('WARDEN')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition ${
+                    staffRoleFilter === 'WARDEN'
+                      ? 'bg-[#26415C] text-white'
+                      : 'bg-white text-[#5B6472] border border-[#E4E1DA]'
+                  }`}
+                >
+                  Wardens
+                </button>
+              </div>
             </div>
 
             <select
-              value={selectedWardenEmail}
-              onChange={(e) => handleWardenSelect(e.target.value)}
+              value={selectedStaffEmail}
+              onChange={(e) => handleStaffSelect(e.target.value)}
               className="w-full px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] focus:outline-none focus:border-[#26415C] transition font-medium"
             >
-              <option value="">— Select a Hostel Warden (H1 to H12) —</option>
-              {ALL_WARDEN_PRESETS.map((w) => (
-                <option key={w.email} value={w.email}>
-                  [{w.code}] {w.name} ({w.hostelName})
-                </option>
-              ))}
+              <option value="">— Select Hostel Staff (H1 to H12) —</option>
+
+              {(staffRoleFilter === 'ALL' || staffRoleFilter === 'CARETAKER') && (
+                <optgroup label="🔑 Hostel Caretakers — Room Allocation & Operations (H1–H12)">
+                  {ALL_CARETAKER_PRESETS.map((c) => (
+                    <option key={c.email} value={c.email}>
+                      [{c.code}] {c.name} — Caretaker ({c.hostelName})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {(staffRoleFilter === 'ALL' || staffRoleFilter === 'WARDEN') && (
+                <optgroup label="🏛️ Hostel Wardens — Administrative Oversight (H1–H12)">
+                  {ALL_WARDEN_PRESETS.map((w) => (
+                    <option key={w.email} value={w.email}>
+                      [{w.code}] {w.name} — Warden ({w.hostelName})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
-            {selectedWardenEmail && (
-              <div className="mt-2 text-[11px] text-[#2E7D5B] font-medium flex items-center gap-1">
-                <Check className="w-3 h-3 text-[#2E7D5B]" />
-                <span>Selected: {selectedWardenEmail} (Password: password123)</span>
+            {selectedStaffObj && (
+              <div className="mt-2 text-[11px] text-[#2E7D5B] font-medium flex items-center justify-between bg-[#F0FDF4] border border-[#BBF7D0] p-1.5 rounded">
+                <div className="flex items-center gap-1 truncate">
+                  <Check className="w-3 h-3 text-[#2E7D5B] shrink-0" />
+                  <span className="truncate">
+                    [{selectedStaffObj.code}] {selectedStaffObj.name} ({selectedStaffObj.role === 'CARETAKER' ? 'Caretaker • Room Allocation' : 'Warden'})
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] shrink-0 text-[#166534]">
+                  pass: password123
+                </span>
               </div>
             )}
           </div>

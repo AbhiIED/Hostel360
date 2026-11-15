@@ -279,6 +279,53 @@ export async function listHostelWardens(req, res) {
 }
 
 /**
+ * Public endpoint: Returns all hostel wardens and caretakers for quick sign-in.
+ */
+export async function listHostelStaff(req, res) {
+  try {
+    const [wardens, caretakers] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'WARDEN', is_active: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          staff_hostel_assignments: {
+            where: { end_date: null },
+            select: {
+              is_primary: true,
+              hostel: { select: { id: true, code: true, name: true, type: true } },
+            },
+          },
+        },
+        orderBy: { email: 'asc' },
+      }),
+      prisma.user.findMany({
+        where: { role: 'CARETAKER', is_active: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          staff_hostel_assignments: {
+            where: { end_date: null },
+            select: {
+              is_primary: true,
+              hostel: { select: { id: true, code: true, name: true, type: true } },
+            },
+          },
+        },
+        orderBy: { email: 'asc' },
+      }),
+    ]);
+
+    return res.json({ wardens, caretakers });
+  } catch (error) {
+    console.error('listHostelStaff error:', error);
+    return res.status(500).json({ error: 'Failed to fetch hostel staff' });
+  }
+}
+
+/**
  * Public endpoint: Returns available hostels and active admission windows for student registration.
  */
 export async function getRegistrationOptions(req, res) {

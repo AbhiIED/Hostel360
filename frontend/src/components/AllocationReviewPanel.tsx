@@ -7,6 +7,9 @@ import {
   Shuffle,
   Check,
   Flag,
+  Sparkles,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 interface RoomAllocationItem {
@@ -86,6 +89,83 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
   // Review single modal
   const [selectedAlloc, setSelectedAlloc] = useState<RoomAllocationItem | null>(null);
   const [reviewNote, setReviewNote] = useState<string>('');
+
+  // Run Lottery Modal states
+  const [windows, setWindows] = useState<any[]>([]);
+  const [isRunModalOpen, setIsRunModalOpen] = useState<boolean>(false);
+  const [selectedWindowId, setSelectedWindowId] = useState<string>('');
+  const [customSeed, setCustomSeed] = useState<string>('');
+  const [isRunningLottery, setIsRunningLottery] = useState<boolean>(false);
+
+  const fetchWindows = async () => {
+    try {
+      const params: any = {};
+      if (hostelId) params.hostel_id = hostelId;
+      const res = await api.get('/allocations/windows', { params });
+      const winList = res.data.windows || [];
+      setWindows(winList);
+      if (winList.length > 0 && !selectedWindowId) {
+        setSelectedWindowId(winList[0].id);
+      }
+    } catch (err) {
+      console.warn('Failed to load admission windows:', err);
+    }
+  };
+
+  const handleRunBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWindowId) {
+      setMessage({ type: 'error', text: 'Please select an admission registration window.' });
+      return;
+    }
+    try {
+      setIsRunningLottery(true);
+      setMessage(null);
+      const win = windows.find((w) => w.id === selectedWindowId);
+      const targetHostelId = hostelId || win?.hostel_id || win?.hostel?.id;
+      if (!targetHostelId) {
+        setMessage({ type: 'error', text: 'No hostel associated with this window.' });
+        return;
+      }
+
+      const payload: any = {
+        window_id: selectedWindowId,
+        hostel_id: targetHostelId,
+      };
+      if (customSeed.trim()) {
+        payload.lottery_seed = customSeed.trim();
+      }
+
+      const res = await api.post('/allocations/batches/run', payload);
+      setMessage({
+        type: 'success',
+        text: res.data.message || 'Batch allocation executed successfully!',
+      });
+      setIsRunModalOpen(false);
+
+      // Refresh batch list and select newly created batch
+      const batchRes = await api.get('/allocations/batches', {
+        params: hostelId ? { hostel_id: hostelId } : {},
+      });
+      const batchList = batchRes.data.batches || [];
+      setBatches(batchList);
+      if (res.data.batch?.id) {
+        setSelectedBatchId(res.data.batch.id);
+        fetchBatchDetails(res.data.batch.id);
+      } else if (batchList.length > 0) {
+        setSelectedBatchId(batchList[0].id);
+        fetchBatchDetails(batchList[0].id);
+      }
+    } catch (err: any) {
+      console.error('Failed to run batch allocation:', err);
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Failed to run batch room lottery allocation.',
+      });
+    } finally {
+      setIsRunningLottery(false);
+    }
+  };
 
   const fetchBatches = async () => {
     try {
@@ -209,7 +289,18 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
         </div>
 
         {/* Batch Selector & Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              fetchWindows();
+              setIsRunModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-[#26415C] hover:bg-[#1e344a] text-white rounded transition shadow-sm"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>Run Room Lottery</span>
+          </button>
+
           {batches.length > 0 && (
             <select
               value={selectedBatchId}
@@ -218,7 +309,7 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
             >
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.hostel?.name || 'Hostel'} — Seed: {b.lottery_seed.slice(0, 12)}... (
+                  {b.hostel?.name || 'Hostel'} — Seed: {b.lottery_seed.slice(0, 10)}... (
                   {new Date(b.created_at).toLocaleDateString()})
                 </option>
               ))}
@@ -350,10 +441,31 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
           <tbody className="divide-y divide-[#E4E1DA]">
             {filteredAllocations.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[#5B6472]">
-                  {batches.length === 0
-                    ? 'No batch allocations executed yet for this hostel.'
-                    : 'No allocations match the selected filter.'}
+                <td colSpan={7} className="px-4 py-10 text-center text-[#5B6472]">
+                  {batches.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-[#FAF9F6] border border-[#E4E1DA] flex items-center justify-center mb-3 text-[#26415C]">
+                        <Shuffle className="w-5 h-5" />
+                      </div>
+                      <div className="font-semibold text-sm text-[#1C2430]">No batch allocations executed yet</div>
+                      <p className="text-xs text-[#5B6472] max-w-md mt-1 mb-4 leading-relaxed">
+                        Registered students awaiting room assignment can be placed using the Caretaker 7-pass cascade lottery algorithm (Floor Affinity → Accessibility Pre-Pass → Room Sharing).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          fetchWindows();
+                          setIsRunModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 text-xs font-medium px-4 py-2 bg-[#26415C] hover:bg-[#1e344a] text-white rounded transition shadow-sm"
+                      >
+                        <Shuffle className="w-4 h-4" />
+                        <span>Run First Room Lottery Batch</span>
+                      </button>
+                    </div>
+                  ) : (
+                    'No allocations match the selected filter.'
+                  )}
                 </td>
               </tr>
             ) : (
@@ -550,6 +662,135 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Run Batch Room Lottery */}
+      {isRunModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-xl border border-[#E4E1DA] w-full max-w-lg p-6 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between pb-3 border-b border-[#E4E1DA] mb-4">
+              <div>
+                <h3 className="font-serif text-lg font-medium text-[#1C2430] flex items-center gap-2">
+                  <Shuffle className="w-5 h-5 text-[#26415C]" />
+                  <span>Run Batch Room Lottery</span>
+                </h3>
+                <p className="text-xs text-[#5B6472] mt-0.5">
+                  Automated 7-pass offline cascade engine for registered student applicants
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRunModalOpen(false)}
+                className="text-[#5B6472] hover:text-[#1C2430] p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRunBatch} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-[#1C2430] mb-1">
+                  Target Admission Window
+                </label>
+                {windows.length === 0 ? (
+                  <div className="p-3 bg-[#FAF9F6] border border-[#E4E1DA] rounded text-[#5B6472]">
+                    No active registration windows found for this hostel. If students registered recently, an admission window was automatically created.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedWindowId}
+                    onChange={(e) => setSelectedWindowId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] focus:outline-none focus:border-[#26415C] font-medium"
+                    required
+                  >
+                    <option value="">— Select Registration Window —</option>
+                    {windows.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.hostel?.name || 'Hostel'} • {w.academic_year} (Sem {w.semester}) — {w._count?.applications || 0} applicants [{w.status}]
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-medium text-[#1C2430]">
+                    Audit Lottery Seed (Optional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCustomSeed(`SEED-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`)}
+                    className="text-[11px] text-[#26415C] hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Generate Seed</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={customSeed}
+                  onChange={(e) => setCustomSeed(e.target.value)}
+                  placeholder="Leave blank for secure random seed (e.g. SEED-2026-X89F)"
+                  className="w-full px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] placeholder-[#5B6472]/60 focus:outline-none focus:border-[#26415C] font-mono"
+                />
+                <span className="text-[10px] text-[#5B6472] mt-0.5 block">
+                  Seed guarantees deterministic, audit-reproducible lottery results for Council of Wardens oversight.
+                </span>
+              </div>
+
+              {/* 7-Pass Algorithm Overview */}
+              <div className="p-3 rounded-lg bg-[#FAF9F6] border border-[#E4E1DA] text-[11px] text-[#5B6472] space-y-1.5">
+                <div className="font-semibold text-[#1C2430] text-xs">7-Pass Cascade Engine Steps:</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-[#26415C]/10 text-[#26415C] flex items-center justify-center font-bold text-[9px]">1</span>
+                    <span>Floor Target Match</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-[#26415C]/10 text-[#26415C] flex items-center justify-center font-bold text-[9px]">2</span>
+                    <span>♿ Accessibility Pre-pass</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-[#26415C]/10 text-[#26415C] flex items-center justify-center font-bold text-[9px]">3</span>
+                    <span>Adjacent Floor Fallback</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-[#26415C]/10 text-[#26415C] flex items-center justify-center font-bold text-[9px]">4</span>
+                    <span>Hostel Any-Floor Fill</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#E4E1DA] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRunModalOpen(false)}
+                  disabled={isRunningLottery}
+                  className="px-3 py-2 rounded border border-[#D5D2CA] text-[#5B6472] hover:bg-[#F6F5F2] font-medium text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRunningLottery || windows.length === 0}
+                  className="px-4 py-2 bg-[#26415C] hover:bg-[#1e344a] text-white font-medium rounded text-xs transition flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                >
+                  {isRunningLottery ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Executing Lottery Cascade...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shuffle className="w-3.5 h-3.5" />
+                      <span>Execute Batch Lottery</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

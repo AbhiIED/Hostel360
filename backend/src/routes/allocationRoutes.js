@@ -29,21 +29,21 @@ router.use(authenticate);
 
 // --- 1. Registration Windows ---
 router.get('/windows', listWindows);
-router.post('/windows', authorize('SUPER_ADMIN'), createWindow);
-router.patch('/windows/:id/close', authorize('SUPER_ADMIN'), closeWindow);
+router.post('/windows', authorize('SUPER_ADMIN', 'WARDEN', 'CARETAKER'), createWindow);
+router.patch('/windows/:id/close', authorize('SUPER_ADMIN', 'WARDEN', 'CARETAKER'), closeWindow);
 
 // --- 2. Floor-Year Mappings ---
 router.get('/floor-year-mappings/:hostelId', getFloorYearMappings);
-router.put('/floor-year-mappings/:hostelId', authorize('SUPER_ADMIN'), updateFloorYearMappings);
+router.put('/floor-year-mappings/:hostelId', authorize('SUPER_ADMIN', 'WARDEN', 'CARETAKER'), updateFloorYearMappings);
 
 // --- 3. Hostel Applications ---
 router.post('/applications', authorize('STUDENT'), submitApplication);
 router.get('/applications/my', authorize('STUDENT'), getMyApplication);
 router.get('/applications', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), listApplications);
-router.patch('/applications/:id/manual-place', authorize('SUPER_ADMIN'), manualPlaceEscalated);
+router.patch('/applications/:id/manual-place', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), manualPlaceEscalated);
 
 // --- 4. Batch Allocation Engine & Review ---
-router.post('/batches/run', authorize('SUPER_ADMIN', 'WARDEN'), runBatch);
+router.post('/batches/run', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), runBatch);
 router.get('/batches', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), listBatches);
 router.get('/batches/:id', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), getBatchDetails);
 router.post('/batches/:id/confirm-clean', authorize('CARETAKER', 'WARDEN', 'VICE_WARDEN', 'SUPER_ADMIN'), bulkConfirmClean);

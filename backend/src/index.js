@@ -105,7 +105,7 @@ app.get(['/', '/health', '/api/health'], (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use(['/api/auth', '/auth'], authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/hostels', hostelRoutes);
 app.use('/api/messes', messRoutes);

@@ -43,8 +43,20 @@ export const LoginPage: React.FC = () => {
         navigate(from, { replace: true });
       }
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Authentication failed. Please check credentials.');
+      const axiosError = err as {
+        response?: { data?: { error?: string }; status?: number };
+        code?: string;
+        message?: string;
+      };
+      if (axiosError.response?.data?.error) {
+        setError(axiosError.response.data.error);
+      } else if (axiosError.code === 'ERR_NETWORK' || !axiosError.response) {
+        setError('Cannot connect to backend server. The server may still be deploying or waking up — please wait a moment and try again.');
+      } else if (axiosError.response?.status === 502 || axiosError.response?.status === 503) {
+        setError('Backend service is currently booting up. Please retry in 30 seconds.');
+      } else {
+        setError('Authentication failed. Please check credentials.');
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -6,15 +6,23 @@ async function registerAllHostelKiosks() {
   console.log('🔄 Starting campus-wide registration of all Hostel Gate & Mess Kiosks (H1 to H12)...');
 
   // 1. Fetch Super Admin for registered_by
-  const superAdmin = await prisma.user.findFirst({
+  let superAdmin = await prisma.user.findFirst({
     where: { role: 'SUPER_ADMIN' },
   });
   if (!superAdmin) {
-    throw new Error('Super Admin user not found');
+    console.log('Super Admin user not found. Fresh database detected — running prisma/seed.js first...');
+    const { execSync } = await import('child_process');
+    execSync('node prisma/seed.js', { stdio: 'inherit' });
+    superAdmin = await prisma.user.findFirst({
+      where: { role: 'SUPER_ADMIN' },
+    });
+    if (!superAdmin) {
+      throw new Error('Super Admin user not found even after seeding');
+    }
   }
 
   // 2. Fetch all 12 hostels
-  const hostels = await prisma.hostel.findMany({
+  let hostels = await prisma.hostel.findMany({
     orderBy: { code: 'asc' },
     include: {
       gates: {
@@ -29,6 +37,19 @@ async function registerAllHostelKiosks() {
       },
     },
   });
+
+  if (hostels.length === 0) {
+    console.log('No hostels found. Running prisma/seed.js first...');
+    const { execSync } = await import('child_process');
+    execSync('node prisma/seed.js', { stdio: 'inherit' });
+    hostels = await prisma.hostel.findMany({
+      orderBy: { code: 'asc' },
+      include: {
+        gates: { include: { devices: true } },
+        messes: { include: { devices: true } },
+      },
+    });
+  }
 
   console.log(`Found ${hostels.length} hostels.`);
 

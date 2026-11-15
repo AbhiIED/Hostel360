@@ -1,17 +1,49 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Lock, Mail, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Shield, Lock, Mail, AlertCircle, Loader2, ArrowRight, Building, Check } from 'lucide-react';
+
+interface WardenPreset {
+  code: string;
+  hostelName: string;
+  name: string;
+  email: string;
+}
+
+const ALL_WARDEN_PRESETS: WardenPreset[] = [
+  { code: 'H1', hostelName: 'Homi Bhabha Bhawan (Boys)', name: 'Dr. A. K. Sharma', email: 'warden.h1@hostel360.com' },
+  { code: 'H2', hostelName: 'Vikram Sarabhai Bhawan (Boys)', name: 'Dr. S. K. Gupta', email: 'warden.h2@hostel360.com' },
+  { code: 'H3', hostelName: 'Hostel No. 3 (Boys)', name: 'Dr. Manoj Kumar', email: 'warden.h3@hostel360.com' },
+  { code: 'H4', hostelName: 'Hostel No. 4 (Boys)', name: 'Dr. R. K. Singh', email: 'warden.h4@hostel360.com' },
+  { code: 'H5', hostelName: 'M. Visvesvarayya Bhawan (Boys)', name: 'Dr. V. K. Verma', email: 'warden.h5@hostel360.com' },
+  { code: 'H6', hostelName: 'J. C. Bose Bhawan (Boys)', name: 'Dr. Amit Joshi', email: 'warden.h6@hostel360.com' },
+  { code: 'H7', hostelName: 'Kalpana Chawla Bhawan (Girls)', name: 'Dr. Sunita Patel', email: 'warden.h7@hostel360.com' },
+  { code: 'H8', hostelName: 'Ramanujan Bhawan (Boys)', name: 'Dr. Neeraj Jain', email: 'warden.h8@hostel360.com' },
+  { code: 'H9', hostelName: 'Raja Ramanna Bhawan (Boys)', name: 'Dr. Sanjay Tiwari', email: 'warden.h9@hostel360.com' },
+  { code: 'H10', hostelName: 'Dr. APJ Abdul Kalam Mega (Boys)', name: 'Dr. D. K. Agarwal', email: 'warden.h10@hostel360.com' },
+  { code: 'H11', hostelName: 'Appu Bhavan (Boys/PhD)', name: 'Dr. Alok Tripathi', email: 'warden.h11@hostel360.com' },
+  { code: 'H12', hostelName: 'Bhagini Nivedita Bhawan (Girls)', name: 'Dr. Priya Sharma', email: 'warden.h12@hostel360.com' },
+];
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedWardenEmail, setSelectedWardenEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { user, isAuthenticated, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleWardenSelect = (wardenEmail: string) => {
+    setSelectedWardenEmail(wardenEmail);
+    if (wardenEmail) {
+      setEmail(wardenEmail);
+      setPassword('password123');
+      setError(null);
+    }
+  };
 
   // If already authenticated, redirect straight to their role console
   if (isAuthenticated && user) {
@@ -91,6 +123,39 @@ export const LoginPage: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Dedicated Hostel Warden Dropdown */}
+          <div className="mb-5 p-3.5 rounded-lg bg-[#FAF9F6] border border-[#E4E1DA]">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-[#1C2430] flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-[#26415C]" />
+                <span>Hostel Warden Quick Sign-In</span>
+              </label>
+              <span className="text-[10px] text-[#26415C] font-mono bg-white px-2 py-0.5 rounded border border-[#E4E1DA]">
+                H1 to H12
+              </span>
+            </div>
+
+            <select
+              value={selectedWardenEmail}
+              onChange={(e) => handleWardenSelect(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] focus:outline-none focus:border-[#26415C] transition font-medium"
+            >
+              <option value="">— Select a Hostel Warden (H1 to H12) —</option>
+              {ALL_WARDEN_PRESETS.map((w) => (
+                <option key={w.email} value={w.email}>
+                  [{w.code}] {w.name} ({w.hostelName})
+                </option>
+              ))}
+            </select>
+
+            {selectedWardenEmail && (
+              <div className="mt-2 text-[11px] text-[#2E7D5B] font-medium flex items-center gap-1">
+                <Check className="w-3 h-3 text-[#2E7D5B]" />
+                <span>Selected: {selectedWardenEmail} (Password: password123)</span>
+              </div>
+            )}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

@@ -240,6 +240,45 @@ export async function getMe(req, res) {
 }
 
 /**
+ * Public endpoint: Returns all hostel wardens and their assigned hostels for quick sign-in.
+ */
+export async function listHostelWardens(req, res) {
+  try {
+    const wardens = await prisma.user.findMany({
+      where: {
+        role: 'WARDEN',
+        is_active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        staff_hostel_assignments: {
+          where: { end_date: null },
+          select: {
+            is_primary: true,
+            hostel: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                type: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { email: 'asc' },
+    });
+
+    return res.json({ wardens });
+  } catch (error) {
+    console.error('listHostelWardens error:', error);
+    return res.status(500).json({ error: 'Failed to fetch hostel wardens' });
+  }
+}
+
+/**
  * Public endpoint: Returns available hostels and active admission windows for student registration.
  */
 export async function getRegistrationOptions(req, res) {

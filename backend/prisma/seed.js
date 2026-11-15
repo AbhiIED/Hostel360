@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { seedAllWardens } from '../scripts/seed_all_wardens.js';
 
 const prisma = new PrismaClient();
 
@@ -603,6 +604,7 @@ async function main() {
   }
 
   console.log('✅ Seeded 4 Hardware Kiosks with unique 32-byte secrets (per-device binding enforced).');
+  await seedAllWardens();
   console.log('🚀 MANIT Campus Seed completed successfully!');
   console.log('');
   console.log('📋 Login Credentials:');

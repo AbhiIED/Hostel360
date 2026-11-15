@@ -7,6 +7,7 @@ import {
   getMe,
   getRegistrationOptions,
   registerStudentWithLottery,
+  listHostelWardens,
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -33,6 +34,7 @@ const registerLimiter = rateLimit({
 // Public endpoints
 router.post('/login', loginLimiter, login);
 router.post('/refresh', refresh);
+router.get('/wardens', listHostelWardens);
 router.get('/registration-options', getRegistrationOptions);
 router.post('/register', registerLimiter, registerStudentWithLottery);
 

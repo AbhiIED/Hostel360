@@ -95,8 +95,8 @@ const io = new SocketIOServer(server, {
 // Attach Socket.IO instance to app for use in routes/controllers
 app.set('io', io);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoints (supports root /, /health, and /api/health for keep-alive pings)
+app.get(['/', '/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),

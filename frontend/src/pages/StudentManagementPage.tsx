@@ -16,7 +16,7 @@ interface StudentItem {
   photo_url?: string | null;
   user: { id: string; name: string; email: string; role: string; is_active: boolean };
   hostel: { id: string; name: string; code: string };
-  room: { id: string; room_number: string; floor: number; block?: string | null };
+  room?: { id: string; room_number: string; floor: number; block?: string | null } | null;
 }
 
 interface Hostel {
@@ -125,7 +125,7 @@ export const StudentManagementPage: React.FC = () => {
     setForm({
       name: s.user.name, email: s.user.email, password: '', roll_number: s.roll_number,
       gender: s.gender, department: s.department || '', year: s.year ?? '',
-      hostel_id: s.hostel.id, room_id: s.room.id,
+      hostel_id: s.hostel.id, room_id: s.room?.id || '',
       current_state: s.current_state,
       reason: '',
     });
@@ -147,7 +147,7 @@ export const StudentManagementPage: React.FC = () => {
         const yearVal = form.year ? Number(form.year) : null;
         if (yearVal !== (editStudent.year ?? null)) payload.year = yearVal;
         if (form.hostel_id !== editStudent.hostel.id) payload.hostel_id = form.hostel_id;
-        if (form.room_id !== editStudent.room.id) payload.room_id = form.room_id;
+        if (form.room_id !== (editStudent.room?.id || '')) payload.room_id = form.room_id;
         if (form.current_state !== editStudent.current_state) {
           payload.current_state = form.current_state;
         }
@@ -310,7 +310,15 @@ export const StudentManagementPage: React.FC = () => {
                       <td className="px-4 py-3">
                         <span className="text-xs text-[#1C2430]">{s.hostel.code}</span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-[#1C2430]">{s.room.room_number}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[#1C2430]">
+                        {s.room ? (
+                          s.room.room_number
+                        ) : (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-[#E0F2FE] text-[#0369A1] border border-[#BAE6FD]">
+                            Awaiting Lottery
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs text-[#5B6472]">
                         {s.department || '—'}
                         {s.year ? ` / Y${s.year}` : ''}

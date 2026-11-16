@@ -197,13 +197,26 @@ export const KioskDisplayPage: React.FC = () => {
     try {
       let data: QrTokenResponse;
       if (deviceSecret) {
-        const res = await api.get<QrTokenResponse>('/display/qr', {
-          headers: {
-            Authorization: `Bearer ${deviceSecret}`,
-            'x-device-id': deviceId,
-          },
-        });
-        data = res.data;
+        try {
+          const res = await api.get<QrTokenResponse>('/display/qr', {
+            headers: {
+              Authorization: `Bearer ${deviceSecret}`,
+              'x-device-id': deviceId,
+            },
+          });
+          data = res.data;
+        } catch (secErr: any) {
+          if (secErr.response?.status === 401) {
+            console.warn('Invalid device secret in localStorage, purging and falling back to auto-sync');
+            localStorage.removeItem(storageKey);
+            setDeviceSecret('');
+            setSecretInput('');
+            const fallback = await api.get<QrTokenResponse>(`/display/qr-token/${deviceId}`);
+            data = fallback.data;
+          } else {
+            throw secErr;
+          }
+        }
       } else {
         // Try public kiosk display endpoint first, fallback to staff device endpoint if authenticated
         try {
@@ -241,8 +254,9 @@ export const KioskDisplayPage: React.FC = () => {
     } catch (err: any) {
       console.error('Error fetching QR token:', err);
       if (err.response?.status === 401) {
-        setErrorStatus('Unauthorized: Invalid or expired device secret. Please reconfigure secret.');
-        setShowConfigModal(true);
+        localStorage.removeItem(storageKey);
+        setDeviceSecret('');
+        setErrorStatus('Device authorization failed. Please check terminal status.');
       } else if (err.response?.status === 403) {
         setErrorStatus('Device Disabled: This terminal has been deactivated by the administrator.');
       } else {
@@ -364,6 +378,17 @@ export const KioskDisplayPage: React.FC = () => {
     setShowConfigModal(false);
     setConfigError('');
     setErrorStatus(null);
+  };
+
+  // Handle clearing secret and resetting to auto-sync
+  const handleClearSecret = () => {
+    localStorage.removeItem(storageKey);
+    setDeviceSecret('');
+    setSecretInput('');
+    setShowConfigModal(false);
+    setConfigError('');
+    setErrorStatus(null);
+    fetchNextQrToken();
   };
 
   // Percentage for progress bar
@@ -813,7 +838,15 @@ export const KioskDisplayPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleClearSecret}
+                  className="py-2 px-3 rounded border border-[#E4E1DA] bg-[#FAF9F6] text-[#B3432B] hover:bg-[#F2EFE9] font-medium text-xs transition cursor-pointer"
+                  title="Remove saved secret and use auto-sync kiosk mode"
+                >
+                  Clear Secret (Auto-Sync)
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}

@@ -500,16 +500,26 @@ export async function listBatches(req, res) {
       where.hostel_id = hostel_id;
     }
 
-    const batches = await prisma.allocationBatch.findMany({
+    const rawBatches = await prisma.allocationBatch.findMany({
       where,
       include: {
         hostel: { select: { id: true, name: true, code: true } },
-        window: { select: { id: true, academic_session: true, status: true } },
+        window: { select: { id: true, academic_year: true, semester: true, status: true } },
         executor: { select: { id: true, name: true, role: true } },
         _count: { select: { allocations: true } },
       },
       orderBy: { created_at: 'desc' },
     });
+
+    const batches = rawBatches.map((b) => ({
+      ...b,
+      window: b.window
+        ? {
+            ...b.window,
+            academic_session: b.window.academic_year,
+          }
+        : null,
+    }));
 
     return res.json({ batches });
   } catch (error) {

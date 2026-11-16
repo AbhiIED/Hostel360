@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   Camera,
   QrCode,
@@ -79,6 +80,7 @@ interface MessAttendanceLog {
 }
 
 export const StudentAppPage: React.FC = () => {
+  const { confirm, alert: customAlert } = useConfirm();
   const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'mess' | 'leave' | 'allocation'>('scan');
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [hostelLogs, setHostelLogs] = useState<HostelAttendanceLog[]>([]);
@@ -356,12 +358,22 @@ export const StudentAppPage: React.FC = () => {
   };
 
   const handleCancelLeave = async (id: string) => {
-    if (!window.confirm('Are you sure you want to cancel this out-pass request?')) return;
+    const ok = await confirm({
+      title: 'Cancel Out-Pass Request?',
+      message: 'Are you sure you want to cancel this out-pass request?',
+      confirmText: 'Yes, Cancel Request',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       await api.patch(`/curfew/leave-requests/${id}/cancel`);
       fetchLeaveData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel leave request');
+      await customAlert({
+        title: 'Action Failed',
+        message: err.response?.data?.error || 'Failed to cancel leave request',
+        variant: 'danger',
+      });
     }
   };
 

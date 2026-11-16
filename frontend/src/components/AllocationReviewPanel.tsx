@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -78,6 +79,7 @@ interface AllocationReviewPanelProps {
 }
 
 export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ hostelId }) => {
+  const { confirm } = useConfirm();
   const [batches, setBatches] = useState<any[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [batchDetails, setBatchDetails] = useState<BatchDetails | null>(null);
@@ -225,7 +227,13 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
 
   const handleBulkConfirmClean = async () => {
     if (!selectedBatchId) return;
-    if (!window.confirm('Confirm all clean proposed allocations for this batch? This will write room assignments to students.')) {
+    const ok = await confirm({
+      title: 'Bulk Confirm Clean Allocations',
+      message: 'Confirm all clean proposed allocations for this batch? This will write permanent room assignments to students.',
+      confirmText: 'Confirm All Clean',
+      variant: 'primary',
+    });
+    if (!ok) {
       return;
     }
     try {

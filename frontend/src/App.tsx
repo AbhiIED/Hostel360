@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Header } from './components/Header';
 import { DashboardNav } from './components/DashboardNav';
@@ -212,7 +213,8 @@ const HomeView = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <ConfirmProvider>
+        <BrowserRouter>
         <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
           <Header />
           <DashboardNav />
@@ -329,6 +331,7 @@ export default function App() {
           <Footer />
         </div>
       </BrowserRouter>
-    </AuthProvider>
+    </ConfirmProvider>
+  </AuthProvider>
   );
 }

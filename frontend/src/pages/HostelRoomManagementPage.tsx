@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   Building2, Plus, RefreshCw, DoorOpen,
   AlertTriangle, ChevronRight, X,
@@ -70,6 +71,7 @@ interface Gate {
 }
 
 export const HostelRoomManagementPage: React.FC = () => {
+  const { confirm, alert: customAlert } = useConfirm();
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const [selectedHostel, setSelectedHostel] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -219,7 +221,13 @@ export const HostelRoomManagementPage: React.FC = () => {
   };
 
   const handleCloseWindow = async (windowId: string, autoRunBatch: boolean = true) => {
-    if (!confirm('Close this window? ' + (autoRunBatch ? 'This will automatically execute batch room allocation.' : ''))) return;
+    const ok = await confirm({
+      title: 'Close Registration Window?',
+      message: 'Close this registration window? ' + (autoRunBatch ? 'This will automatically execute batch room allocation.' : ''),
+      confirmText: autoRunBatch ? 'Close & Run Batch' : 'Close Window',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       setIsSubmitting(true);
       setError(null);
@@ -388,14 +396,24 @@ export const HostelRoomManagementPage: React.FC = () => {
   };
 
   const handleDeleteHostel = async (h: Hostel) => {
-    if (!confirm(`Delete hostel "${h.name}"? This action cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete Hostel?',
+      message: `Are you sure you want to delete hostel "${h.name}"? This action cannot be undone.`,
+      confirmText: 'Delete Hostel',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/hostels/${h.id}`);
       if (selectedHostel === h.id) setSelectedHostel(null);
       fetchHostels();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(msg || 'Failed to delete hostel');
+      await customAlert({
+        title: 'Delete Failed',
+        message: msg || 'Failed to delete hostel',
+        variant: 'danger',
+      });
     }
   };
 

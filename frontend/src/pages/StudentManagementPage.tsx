@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   Users, Plus, RefreshCw, Edit3, Trash2, Search,
   AlertTriangle, X, ChevronLeft, ChevronRight, GraduationCap, CheckCircle, Shuffle
@@ -44,6 +45,7 @@ interface Pagination {
 
 export const StudentManagementPage: React.FC = () => {
   const { user } = useAuth();
+  const { confirm, alert: customAlert } = useConfirm();
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -174,13 +176,23 @@ export const StudentManagementPage: React.FC = () => {
   };
 
   const handleDelete = async (s: StudentItem) => {
-    if (!confirm(`Delete student "${s.user.name}" (${s.roll_number})? This will also delete their user account.`)) return;
+    const ok = await confirm({
+      title: 'Delete Student Record?',
+      message: `Delete student "${s.user.name}" (${s.roll_number})? This will also remove their user account and room allocation.`,
+      confirmText: 'Delete Student',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/students/${s.id}`);
       fetchStudents(pagination.page);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(msg || 'Failed to delete student');
+      await customAlert({
+        title: 'Delete Failed',
+        message: msg || 'Failed to delete student',
+        variant: 'danger',
+      });
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   Plus,
   Trash2,
@@ -42,6 +43,7 @@ interface HostelOption {
 }
 
 export const CurfewManagementPage: React.FC = () => {
+  const { confirm } = useConfirm();
   const [windows, setWindows] = useState<CurfewWindow[]>([]);
   const [hostels, setHostels] = useState<HostelOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +115,13 @@ export const CurfewManagementPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this curfew window rule?')) return;
+    const ok = await confirm({
+      title: 'Delete Curfew Rule?',
+      message: 'Are you sure you want to delete this curfew window rule?',
+      confirmText: 'Delete Rule',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/curfew/windows/${id}`);
       setSuccessMsg('Curfew rule deleted successfully');

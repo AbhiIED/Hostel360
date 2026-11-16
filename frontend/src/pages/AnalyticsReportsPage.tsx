@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   TrendingUp,
   Download,
@@ -68,6 +69,7 @@ interface MealAnalyticsResponse {
 
 export const AnalyticsReportsPage: React.FC = () => {
   const { user } = useAuth();
+  const { alert: customAlert } = useConfirm();
   const [activeTab, setActiveTab] = useState<'occupancy' | 'meals' | 'exports'>('occupancy');
   const [rangeDays, setRangeDays] = useState<number>(7);
   const [loading, setLoading] = useState<boolean>(true);
@@ -181,7 +183,11 @@ export const AnalyticsReportsPage: React.FC = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Export download failed:', err);
-      alert('Failed to generate export file. Please check permissions and try again.');
+      await customAlert({
+        title: 'Export Failed',
+        message: 'Failed to generate export file. Please check permissions and try again.',
+        variant: 'danger',
+      });
     } finally {
       setExporting(null);
     }

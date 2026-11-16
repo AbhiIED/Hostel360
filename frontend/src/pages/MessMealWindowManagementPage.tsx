@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   Utensils, Plus, RefreshCw, Edit3, Trash2, Clock,
   AlertTriangle, X, ToggleLeft, ToggleRight, Coffee, Sun, Cookie, Moon
@@ -23,6 +24,7 @@ interface MessItem {
 }
 
 export const MessMealWindowManagementPage: React.FC = () => {
+  const { confirm, alert: customAlert } = useConfirm();
   const [messes, setMesses] = useState<MessItem[]>([]);
   const [selectedMess, setSelectedMess] = useState<string | null>(null);
   const [mealWindows, setMealWindows] = useState<MealWindow[]>([]);
@@ -102,14 +104,24 @@ export const MessMealWindowManagementPage: React.FC = () => {
   };
 
   const handleDeleteMess = async (m: MessItem) => {
-    if (!confirm(`Delete mess "${m.name}"? This action cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete Mess Hall?',
+      message: `Are you sure you want to delete mess hall "${m.name}"? This action cannot be undone.`,
+      confirmText: 'Delete Mess',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/messes/${m.id}`);
       if (selectedMess === m.id) setSelectedMess(null);
       fetchMesses();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(msg || 'Failed to delete mess');
+      await customAlert({
+        title: 'Delete Failed',
+        message: msg || 'Failed to delete mess hall.',
+        variant: 'danger',
+      });
     }
   };
 
@@ -144,7 +156,11 @@ export const MessMealWindowManagementPage: React.FC = () => {
       fetchMealWindows(selectedMess);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(msg || 'Failed to toggle meal window');
+      await customAlert({
+        title: 'Action Failed',
+        message: msg || 'Failed to toggle meal window status.',
+        variant: 'danger',
+      });
     }
   };
 

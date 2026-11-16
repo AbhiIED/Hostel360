@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../context/ConfirmContext';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Laptop,
@@ -94,6 +95,7 @@ interface LoadedQrState {
 }
 
 export const DeviceManagementPage: React.FC = () => {
+  const { confirm, alert: customAlert } = useConfirm();
   const [hostels, setHostels] = useState<HostelItem[]>([]);
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [gates, setGates] = useState<Gate[]>([]);
@@ -363,7 +365,13 @@ export const DeviceManagementPage: React.FC = () => {
   };
 
   const handleDisableDevice = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to disable ${name}? Active QR tokens will be revoked immediately.`)) {
+    const ok = await confirm({
+      title: 'Disable Terminal Kiosk?',
+      message: `Are you sure you want to disable ${name}? Active QR tokens will be revoked immediately.`,
+      confirmText: 'Disable Kiosk',
+      variant: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -373,7 +381,11 @@ export const DeviceManagementPage: React.FC = () => {
       fetchData();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(msg || 'Failed to disable device');
+      await customAlert({
+        title: 'Action Failed',
+        message: msg || 'Failed to disable device.',
+        variant: 'danger',
+      });
     }
   };
 

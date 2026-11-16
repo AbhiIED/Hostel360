@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, Plus, RefreshCw, Edit3, Trash2, Search,
-  AlertTriangle, X, ChevronLeft, ChevronRight, GraduationCap, CheckCircle
+  AlertTriangle, X, ChevronLeft, ChevronRight, GraduationCap, CheckCircle, Shuffle
 } from 'lucide-react';
 
 interface StudentItem {
@@ -224,6 +225,40 @@ export const StudentManagementPage: React.FC = () => {
         <div className="mb-6 p-3.5 rounded bg-[#B3432B]/10 border border-[#B3432B]/30 text-[#B3432B] text-xs flex items-center gap-2.5">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Awaiting Lottery Notification & Action Banner */}
+      {students.some((s) => !s.room) && (
+        <div className="mb-6 p-4 rounded-lg bg-[#E0F2FE]/60 border border-[#BAE6FD] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-[#0369A1]">
+            <div className="p-2 bg-[#0369A1]/10 rounded-full shrink-0">
+              <Shuffle className="w-4 h-4 text-[#0369A1]" />
+            </div>
+            <div>
+              <span className="font-semibold text-sm">
+                {students.filter((s) => !s.room).length} student(s) currently awaiting room allocation lottery
+              </span>
+              <p className="text-[11px] text-[#0369A1]/90 mt-0.5">
+                Students registered without assigned rooms are queued in the allocation pool. Run the 7-pass cascade lottery to generate proposed room placements.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <Link
+              to="/dashboard/hostels"
+              className="px-3 py-1.5 bg-white border border-[#BAE6FD] hover:bg-[#F0F9FF] text-[#0369A1] font-medium rounded text-xs transition shadow-2xs"
+            >
+              Registration Windows
+            </Link>
+            <Link
+              to="/dashboard"
+              className="px-3.5 py-1.5 bg-[#0369A1] hover:bg-[#0284C7] text-white font-medium rounded text-xs transition shadow-2xs flex items-center gap-1.5"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+              <span>Process Room Lottery</span>
+            </Link>
+          </div>
         </div>
       )}
 

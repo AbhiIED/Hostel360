@@ -33,8 +33,8 @@ export function seededShuffle(array, randomFn) {
 }
 
 /**
- * Auto-creates renewal applications for all current residents of the specified hostel(s)
- * when a registration window opens.
+ * Auto-creates renewal applications for all current residents and auto-enrolls
+ * all unassigned students ("Awaiting Lottery") when a registration window opens.
  */
 export async function createRenewalsForWindow(windowId, hostelId = null) {
   const window = await prisma.registrationWindow.findUnique({
@@ -48,7 +48,7 @@ export async function createRenewalsForWindow(windowId, hostelId = null) {
     ? { hostel_id: window.hostel_id }
     : {};
 
-  // Current residents with assigned rooms
+  // 1. Current residents with assigned rooms (Renewals)
   const currentResidents = await prisma.student.findMany({
     where: {
       ...whereHostel,
@@ -60,10 +60,24 @@ export async function createRenewalsForWindow(windowId, hostelId = null) {
     },
   });
 
+  // 2. Unassigned students ("Awaiting Lottery" - newly registered or without room)
+  const unassignedStudents = await prisma.student.findMany({
+    where: {
+      ...whereHostel,
+      room_id: null,
+    },
+    include: {
+      hostel: true,
+    },
+  });
+
   const createdApplications = [];
 
+  // Enroll continuing residents
   for (const resident of currentResidents) {
-    // Check if an application already exists for this resident in this window
+    const targetHostelId = resident.hostel_id || hostelId || window.hostel_id;
+    if (!targetHostelId) continue;
+
     const existing = await prisma.hostelApplication.findUnique({
       where: {
         window_id_student_id: {
@@ -74,16 +88,44 @@ export async function createRenewalsForWindow(windowId, hostelId = null) {
     });
 
     if (!existing) {
-      // Recalculate year of study: continuing students advance by 1 year (cap at 5)
       const newYearOfStudy = Math.min(5, (resident.year || 1) + 1);
-
       const app = await prisma.hostelApplication.create({
         data: {
           window_id: windowId,
           student_id: resident.id,
-          hostel_id: resident.hostel_id,
+          hostel_id: targetHostelId,
           year_of_study: newYearOfStudy,
           is_renewal: true,
+          accessibility_needs: false,
+          status: 'PENDING',
+        },
+      });
+      createdApplications.push(app);
+    }
+  }
+
+  // Enroll unassigned students awaiting room lottery
+  for (const student of unassignedStudents) {
+    const targetHostelId = student.hostel_id || hostelId || window.hostel_id;
+    if (!targetHostelId) continue;
+
+    const existing = await prisma.hostelApplication.findUnique({
+      where: {
+        window_id_student_id: {
+          window_id: windowId,
+          student_id: student.id,
+        },
+      },
+    });
+
+    if (!existing) {
+      const app = await prisma.hostelApplication.create({
+        data: {
+          window_id: windowId,
+          student_id: student.id,
+          hostel_id: targetHostelId,
+          year_of_study: student.year || 1,
+          is_renewal: false,
           accessibility_needs: false,
           status: 'PENDING',
         },

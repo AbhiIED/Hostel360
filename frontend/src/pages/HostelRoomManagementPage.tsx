@@ -103,12 +103,30 @@ export const HostelRoomManagementPage: React.FC = () => {
   // Registration Windows State
   const [windows, setWindows] = useState<RegWindow[]>([]);
   const [windowModal, setWindowModal] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [windowForm, setWindowForm] = useState({
     hostel_id: '',
     academic_year: '2026-2027',
     open_from: '',
     open_to: '',
   });
+
+  const openCreateWindowModal = () => {
+    const now = new Date();
+    const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const formatLocal = (d: Date) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    setWindowForm({
+      hostel_id: '',
+      academic_year: `${now.getFullYear()}-${now.getFullYear() + 1}`,
+      open_from: formatLocal(now),
+      open_to: formatLocal(nextMonth),
+    });
+    setModalError(null);
+    setWindowModal(true);
+  };
 
   // Floor-Year Mappings State
   const [selectedMappingHostelId, setSelectedMappingHostelId] = useState<string>('');
@@ -128,29 +146,73 @@ export const HostelRoomManagementPage: React.FC = () => {
   // Registration Windows Methods
   const fetchWindows = async () => {
     try {
-      const res = await api.get('/allocations/windows');
-      setWindows(res.data.windows || []);
+      const res = await api.get(`/allocations/windows?_t=${Date.now()}`);
+      if (Array.isArray(res.data?.windows)) {
+        setWindows(res.data.windows);
+      }
     } catch (err: any) {
       console.error('Failed to load windows:', err);
+      const msg = err.response?.data?.error || 'Failed to load registration windows.';
+      setError(msg);
     }
   };
 
   const handleCreateWindow = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError(null);
+
+    if (!windowForm.open_from || !windowForm.open_to) {
+      setModalError('Please specify both opening and closing dates.');
+      return;
+    }
+
+    const fromDate = new Date(windowForm.open_from);
+    const toDate = new Date(windowForm.open_to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      setModalError('Invalid date values provided.');
+      return;
+    }
+
+    if (toDate <= fromDate) {
+      setModalError('Registration closing date must be after opening date.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      setError(null);
       const res = await api.post('/allocations/windows', {
         hostel_id: windowForm.hostel_id || undefined,
         academic_year: windowForm.academic_year,
-        open_from: new Date(windowForm.open_from).toISOString(),
-        open_to: new Date(windowForm.open_to).toISOString(),
+        open_from: fromDate.toISOString(),
+        open_to: toDate.toISOString(),
       });
       setSuccessMessage(res.data.message || 'Window opened successfully.');
       setWindowModal(false);
+      setModalError(null);
+
+      // Optimistically insert newly created window into UI immediately
+      if (res.data?.window) {
+        setWindows((prev) => {
+          const exists = prev.some((w) => w.id === res.data.window.id);
+          if (exists) return prev;
+          const newWin: RegWindow = {
+            ...res.data.window,
+            _count: {
+              applications: res.data.renewals_created || 0,
+              batches: 0,
+              allocation_batches: 0,
+            },
+          };
+          return [newWin, ...prev];
+        });
+      }
+
       fetchWindows();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to open window.');
+      console.error('Failed to open window:', err);
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to open window.';
+      setModalError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -278,7 +340,16 @@ export const HostelRoomManagementPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchHostels(); }, []);
+  useEffect(() => {
+    fetchHostels();
+    fetchWindows();
+  }, []);
+
+  useEffect(() => {
+    if (activeTopTab === 'windows') {
+      fetchWindows();
+    }
+  }, [activeTopTab]);
 
   useEffect(() => {
     if (selectedHostel) fetchHostelDetails(selectedHostel);
@@ -395,10 +466,15 @@ export const HostelRoomManagementPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchHostels}
+            onClick={() => {
+              fetchHostels();
+              fetchWindows();
+              if (selectedMappingHostelId) fetchFloorMappings(selectedMappingHostelId);
+              fetchEscalatedApps();
+            }}
             disabled={isLoading}
             className="p-2 rounded bg-white border border-[#E4E1DA] text-[#5B6472] hover:text-[#1C2430] transition disabled:opacity-50"
-            title="Refresh"
+            title="Refresh all"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -691,13 +767,22 @@ export const HostelRoomManagementPage: React.FC = () => {
                 Open registration windows for sessions or individual hostels. Opening a window auto-generates renewals for continuing residents.
               </p>
             </div>
-            <button
-              onClick={() => setWindowModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#26415C] hover:bg-[#1e344a] text-white text-xs font-medium rounded transition shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Open Registration Window</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchWindows}
+                className="p-2 rounded bg-white border border-[#E4E1DA] text-[#5B6472] hover:text-[#1C2430] transition"
+                title="Refresh windows list"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={openCreateWindowModal}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-[#26415C] hover:bg-[#1e344a] text-white text-xs font-medium rounded transition shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Open Registration Window</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -715,8 +800,19 @@ export const HostelRoomManagementPage: React.FC = () => {
               <tbody className="divide-y divide-[#E4E1DA]">
                 {windows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-[#5B6472]">
-                      No registration windows opened yet.
+                    <td colSpan={6} className="px-4 py-12 text-center text-[#5B6472]">
+                      <Calendar className="w-8 h-8 text-[#5B6472]/60 mx-auto mb-2" strokeWidth={1.5} />
+                      <p className="font-medium text-sm text-[#1C2430] mb-1">No registration windows opened yet</p>
+                      <p className="text-xs text-[#5B6472] mb-3">
+                        Open a registration window to allow students to apply and auto-generate renewal applications for current residents.
+                      </p>
+                      <button
+                        onClick={openCreateWindowModal}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#26415C] hover:bg-[#1e344a] text-white rounded text-xs font-medium transition shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Open First Window</span>
+                      </button>
                     </td>
                   </tr>
                 ) : (
@@ -943,6 +1039,14 @@ export const HostelRoomManagementPage: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="mb-3.5 p-2.5 rounded bg-[#B3432B]/10 border border-[#B3432B]/30 text-[#B3432B] text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleCreateWindow} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-[#1C2430] font-medium mb-1">Target Hostel (Optional)</label>

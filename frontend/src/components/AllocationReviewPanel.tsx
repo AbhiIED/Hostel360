@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
 
 interface RoomAllocationItem {
@@ -92,6 +93,8 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
 
   // Run Lottery Modal states
   const [windows, setWindows] = useState<any[]>([]);
+  const [allHostels, setAllHostels] = useState<any[]>([]);
+  const [targetHostelIdOverride, setTargetHostelIdOverride] = useState<string>('');
   const [isRunModalOpen, setIsRunModalOpen] = useState<boolean>(false);
   const [selectedWindowId, setSelectedWindowId] = useState<string>('');
   const [customSeed, setCustomSeed] = useState<string>('');
@@ -106,6 +109,14 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
       setWindows(winList);
       if (winList.length > 0 && !selectedWindowId) {
         setSelectedWindowId(winList[0].id);
+      }
+      if (!hostelId) {
+        const hRes = await api.get('/hostels');
+        const hList = hRes.data.hostels || [];
+        setAllHostels(hList);
+        if (hList.length > 0 && !targetHostelIdOverride) {
+          setTargetHostelIdOverride(hList[0].id);
+        }
       }
     } catch (err) {
       console.warn('Failed to load admission windows:', err);
@@ -122,9 +133,9 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
       setIsRunningLottery(true);
       setMessage(null);
       const win = windows.find((w) => w.id === selectedWindowId);
-      const targetHostelId = hostelId || win?.hostel_id || win?.hostel?.id;
+      const targetHostelId = hostelId || win?.hostel_id || win?.hostel?.id || targetHostelIdOverride;
       if (!targetHostelId) {
-        setMessage({ type: 'error', text: 'No hostel associated with this window.' });
+        setMessage({ type: 'error', text: 'No hostel associated with this window. Please select a hostel.' });
         return;
       }
 
@@ -694,8 +705,15 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
                   Target Admission Window
                 </label>
                 {windows.length === 0 ? (
-                  <div className="p-3 bg-[#FAF9F6] border border-[#E4E1DA] rounded text-[#5B6472]">
-                    No active registration windows found for this hostel. If students registered recently, an admission window was automatically created.
+                  <div className="p-3 bg-[#FAF9F6] border border-[#E4E1DA] rounded text-[#5B6472] space-y-1.5">
+                    <div>No active registration windows found for this hostel.</div>
+                    <a
+                      href="/dashboard/hostels"
+                      className="inline-flex items-center gap-1 text-[#26415C] font-semibold hover:underline"
+                    >
+                      <span>Open a Registration Window in Hostels & Rooms</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 ) : (
                   <select
@@ -707,12 +725,35 @@ export const AllocationReviewPanel: React.FC<AllocationReviewPanelProps> = ({ ho
                     <option value="">— Select Registration Window —</option>
                     {windows.map((w) => (
                       <option key={w.id} value={w.id}>
-                        {w.hostel?.name || 'Hostel'} • {w.academic_year} (Sem {w.semester}) — {w._count?.applications || 0} applicants [{w.status}]
+                        {w.hostel ? `${w.hostel.name} (${w.hostel.code})` : 'Campus-Wide (All Hostels)'} • {w.academic_year} (Sem {w.semester}) — {w._count?.applications || 0} applicants [{w.status}]
                       </option>
                     ))}
                   </select>
                 )}
               </div>
+
+              {!hostelId && !windows.find((w) => w.id === selectedWindowId)?.hostel_id && allHostels.length > 0 && (
+                <div>
+                  <label className="font-medium text-[#1C2430] block mb-1">
+                    Select Target Hostel for Batch Run
+                  </label>
+                  <select
+                    value={targetHostelIdOverride}
+                    onChange={(e) => setTargetHostelIdOverride(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-[#E4E1DA] rounded text-xs text-[#1C2430] focus:outline-none focus:border-[#26415C]"
+                    required
+                  >
+                    {allHostels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} ({h.code})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-[#5B6472] mt-0.5 block">
+                    Campus-wide window detected. Please pick which hostel's applicant pool and rooms to lottery allocate.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">

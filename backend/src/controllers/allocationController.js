@@ -14,12 +14,12 @@ import { userHasHostelAccess, getUserHostelIds } from '../utils/roleScoping.js';
 // --- Zod Validation Schemas ---
 
 const createWindowSchema = z.object({
-  hostel_id: z.string().uuid().optional().nullable(),
+  hostel_id: z.string().uuid().optional().nullable().or(z.literal('')).transform((val) => (val === '' ? null : val)),
   academic_year: z.string().min(4).max(20).optional(),
   academic_session: z.string().min(4).max(20).optional(),
   semester: z.number().int().min(1).max(2).optional().default(1),
-  open_from: z.string().datetime(),
-  open_to: z.string().datetime(),
+  open_from: z.union([z.string(), z.date()]).refine((val) => !isNaN(new Date(val).getTime()), { message: 'Invalid open_from date' }),
+  open_to: z.union([z.string(), z.date()]).refine((val) => !isNaN(new Date(val).getTime()), { message: 'Invalid open_to date' }),
 });
 
 const submitApplicationSchema = z.object({
@@ -59,21 +59,35 @@ export async function listWindows(req, res) {
     const { hostel_id, status, academic_year, academic_session } = req.query;
     const where = {};
 
-    if (hostel_id) where.hostel_id = hostel_id;
+    if (hostel_id) {
+      where.OR = [
+        { hostel_id: hostel_id },
+        { hostel_id: null },
+      ];
+    }
     if (status) where.status = status;
     const session = academic_year || academic_session;
     if (session) where.academic_year = session;
 
-    const windows = await prisma.registrationWindow.findMany({
+    const rawWindows = await prisma.registrationWindow.findMany({
       where,
       include: {
         hostel: { select: { id: true, name: true, code: true, type: true } },
         _count: {
-          select: { applications: true, batches: true },
+          select: { applications: true, allocation_batches: true },
         },
       },
       orderBy: { created_at: 'desc' },
     });
+
+    const windows = rawWindows.map((win) => ({
+      ...win,
+      _count: {
+        applications: win._count?.applications || 0,
+        batches: win._count?.allocation_batches || 0,
+        allocation_batches: win._count?.allocation_batches || 0,
+      },
+    }));
 
     return res.json({ windows });
   } catch (error) {
@@ -91,6 +105,12 @@ export async function createWindow(req, res) {
 
     const { hostel_id, academic_year, academic_session, semester, open_from, open_to } = parsed.data;
 
+    const fromDate = new Date(open_from);
+    const toDate = new Date(open_to);
+    if (toDate <= fromDate) {
+      return res.status(400).json({ error: 'Closing date (open_to) must be after opening date (open_from)' });
+    }
+
     if (hostel_id) {
       const hostel = await prisma.hostel.findUnique({ where: { id: hostel_id } });
       if (!hostel) return res.status(404).json({ error: 'Hostel not found' });
@@ -101,9 +121,10 @@ export async function createWindow(req, res) {
         hostel_id: hostel_id || null,
         academic_year: academic_year || academic_session || '2026-2027',
         semester: semester || 1,
-        open_from: new Date(open_from),
-        open_to: new Date(open_to),
+        open_from: fromDate,
+        open_to: toDate,
         status: 'OPEN',
+        created_by: req.user?.id || null,
       },
       include: { hostel: true },
     });

@@ -25,6 +25,8 @@ import {
   ShieldCheck,
   ArrowLeftRight,
   Shuffle,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 
 interface StudentProfile {
@@ -789,12 +791,69 @@ export const StudentAppPage: React.FC = () => {
         >
           <Building className="w-3.5 h-3.5" />
           <span>Room Allocation & Swaps</span>
+          {openWindows.length > 0 && myApplications.length === 0 && (
+            <span className="w-2 h-2 rounded-full bg-[#E5484D] inline-block animate-pulse" title="Registration Window Open" />
+          )}
         </button>
       </div>
 
       {/* 3. Tab 1: Scanner View */}
       {activeTab === 'scan' && (
         <div className="space-y-6">
+          {/* Active Room Registration Window Announcement Banner */}
+          {openWindows.length > 0 && myApplications.length === 0 && (
+            <div className="p-4 rounded-lg bg-[#FAF9F6] border border-[#26415C]/20 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 rounded-full bg-[#26415C]/10 text-[#26415C] shrink-0 mt-0.5 sm:mt-0">
+                  <Building className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-[#1C2430] flex items-center gap-1.5">
+                    <span>Hostel Room Registration Window is Open!</span>
+                    <span className="px-1.5 py-0.2 bg-[#2E7D5B]/10 text-[#2E7D5B] text-[10px] font-semibold rounded">
+                      {openWindows[0].academic_year}
+                    </span>
+                  </div>
+                  <p className="text-[#5B6472] mt-0.5">
+                    Submit your room lottery application before {new Date(openWindows[0].open_to).toLocaleDateString()} to participate in room allocations.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('allocation');
+                  fetchAllocationData();
+                }}
+                className="px-3.5 py-1.5 bg-[#26415C] hover:bg-[#1e344a] text-white rounded font-medium text-xs whitespace-nowrap transition shadow-xs flex items-center gap-1.5 shrink-0"
+              >
+                <span>Apply for Room</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Active Lottery Enrollment Status Banner */}
+          {myApplications.length > 0 && !profile?.room?.room_number && (
+            <div className="p-3.5 rounded-lg bg-[#E0F2FE]/40 border border-[#BAE6FD] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+              <div className="flex items-center gap-2 text-[#0369A1]">
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>Room Allocation Status:</strong> Application submitted for {myApplications[0]?.hostel?.name || 'hostel'} (Awaiting Caretaker lottery draw).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('allocation');
+                  fetchAllocationData();
+                }}
+                className="text-xs font-semibold text-[#0369A1] hover:underline whitespace-nowrap shrink-0"
+              >
+                View Status ➔
+              </button>
+            </div>
+          )}
           {scanResult && (
             <div
               className={`p-4 rounded-lg border text-xs flex items-start gap-3 ${

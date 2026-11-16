@@ -143,6 +143,9 @@ export const StudentAppPage: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+  const lastRejectedTokenRef = useRef<string | null>(null);
+  const lastScanAttemptTimeRef = useRef<number>(0);
 
   const fetchLeaveData = useCallback(async () => {
     try {
@@ -384,7 +387,8 @@ export const StudentAppPage: React.FC = () => {
 
   // Submit scanned token to backend
   const submitToken = async (rawToken: string) => {
-    if (!rawToken || isScanning) return;
+    if (!rawToken || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsScanning(true);
 
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
@@ -398,6 +402,9 @@ export const StudentAppPage: React.FC = () => {
     try {
       const res = await api.post('/attendance/scan', { token: rawToken.trim() });
       const data = res.data;
+
+      // SUCCESS: Clear any previously rejected token tracker
+      lastRejectedTokenRef.current = null;
 
       setScanResult({
         success: true,
@@ -422,12 +429,24 @@ export const StudentAppPage: React.FC = () => {
       stopCamera();
     } catch (err: any) {
       console.error('Scan submission error:', err);
+      // Remember this rejected token so camera ignores it until a NEW rotated QR appears
+      lastRejectedTokenRef.current = rawToken.trim();
+
       const errMsg = err.response?.data?.error || 'Failed to process QR scan. Please verify alignment and try again.';
       setScanResult({
         success: false,
-        message: errMsg,
+        message: `${errMsg} (Scanner remains active — waiting for next QR rotation...)`,
       });
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(200);
+        } catch {
+          /* ignore */
+        }
+      }
     } finally {
+      isSubmittingRef.current = false;
       setIsScanning(false);
     }
   };
@@ -435,6 +454,8 @@ export const StudentAppPage: React.FC = () => {
   const startCamera = () => {
     setCameraError(null);
     setScanResult(null);
+    lastRejectedTokenRef.current = null;
+    lastScanAttemptTimeRef.current = 0;
     setCameraActive(true);
   };
 
@@ -509,68 +530,91 @@ export const StudentAppPage: React.FC = () => {
     } catch {
       // use raw string
     }
+
+    if (!extractedToken) return;
+
+    // 1. If this exact token was already rejected, ignore it and wait for screen to rotate
+    if (lastRejectedTokenRef.current && lastRejectedTokenRef.current === extractedToken) {
+      return;
+    }
+
+    // 2. Cooldown check: avoid rapid duplicate requests
+    const now = Date.now();
+    if (now - lastScanAttemptTimeRef.current < 1200) {
+      return;
+    }
+
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    lastScanAttemptTimeRef.current = now;
     submitToken(extractedToken);
   };
 
   const tickScan = async () => {
-    if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      animationFrameRef.current = requestAnimationFrame(tickScan);
+    if (!videoRef.current || !streamRef.current?.active) {
       return;
     }
 
-    const video = videoRef.current;
+    if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const video = videoRef.current;
+      let detectedData: string | null = null;
 
-    // 1. Try Hardware-Accelerated Native BarcodeDetector (instant <10ms on mobile Chrome/Safari)
-    if ('BarcodeDetector' in window) {
-      try {
-        const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-        const barcodes = await barcodeDetector.detect(video);
-        if (barcodes.length > 0 && barcodes[0].rawValue) {
-          handleDetectedData(barcodes[0].rawValue);
-          return;
+      // 1. Hardware-Accelerated Native BarcodeDetector (instant <10ms on mobile Chrome/Safari)
+      if ('BarcodeDetector' in window) {
+        try {
+          const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await barcodeDetector.detect(video);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            detectedData = barcodes[0].rawValue;
+          }
+        } catch {
+          // Fallback to optimized jsQR
         }
-      } catch {
-        // Fallback to optimized jsQR
+      }
+
+      // 2. High-performance downscaled jsQR fallback (max width 640px)
+      if (!detectedData) {
+        let canvas = canvasRef.current;
+        if (!canvas) {
+          canvas = document.createElement('canvas');
+          canvasRef.current = canvas;
+        }
+
+        // Downscale for instant CPU processing (up to 15x faster than 1080p/4K)
+        const maxDim = 640;
+        const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+        const width = Math.round(video.videoWidth * scale);
+        const height = Math.round(video.videoHeight * scale);
+
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, width, height);
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert',
+          });
+          if (code && code.data) {
+            detectedData = code.data;
+          }
+        }
+      }
+
+      if (detectedData) {
+        handleDetectedData(detectedData);
       }
     }
 
-    // 2. High-performance downscaled jsQR fallback (max width 640px)
-    let canvas = canvasRef.current;
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvasRef.current = canvas;
-    }
-
-    // Downscale for instant CPU processing (up to 15x faster than 1080p/4K)
-    const maxDim = 640;
-    const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
-    const width = Math.round(video.videoWidth * scale);
-    const height = Math.round(video.videoHeight * scale);
-
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
+    // Keep camera loop running continuously so it automatically scans the next QR code
+    if (cameraActive && streamRef.current?.active) {
       animationFrameRef.current = requestAnimationFrame(tickScan);
-      return;
     }
-
-    ctx.drawImage(video, 0, 0, width, height);
-    const imageData = ctx.getImageData(0, 0, width, height);
-
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-
-    if (code && code.data) {
-      handleDetectedData(code.data);
-      return;
-    }
-
-    animationFrameRef.current = requestAnimationFrame(tickScan);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {

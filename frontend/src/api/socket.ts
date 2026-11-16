@@ -13,6 +13,10 @@ const getSocketUrl = (): string => {
   if (import.meta.env.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL;
   }
+  if (import.meta.env.VITE_API_URL) {
+    const raw = (import.meta.env.VITE_API_URL as string).trim().replace(/\/+$/, '');
+    return raw.replace(/\/api$/, '');
+  }
   if (
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')

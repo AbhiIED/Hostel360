@@ -112,3 +112,65 @@ export async function getDisplayInfo(req, res) {
     return res.status(500).json({ error: 'Failed to fetch display info' });
   }
 }
+
+/**
+ * GET /api/display/qr-token/:deviceId or /api/display/qr/:deviceId
+ * Public display endpoint for physical kiosks and wall-mounted monitors.
+ * Issues a new dynamic QR token with 20s TTL for the specified active device.
+ */
+export async function getKioskQrToken(req, res) {
+  try {
+    const { deviceId } = req.params;
+
+    const device = await prisma.device.findFirst({
+      where: {
+        OR: [
+          { id: deviceId },
+          { device_code: deviceId },
+        ],
+      },
+      include: {
+        gate: { include: { hostel: true } },
+        mess: { include: { hostel: true } },
+      },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Display device not found' });
+    }
+
+    if (!device.is_active) {
+      return res.status(403).json({ error: 'This display device has been disabled' });
+    }
+
+    // Generate new dynamic QR token
+    const tokenResult = await generateQrToken(device);
+
+    // Update device heartbeat asynchronously
+    prisma.device.update({
+      where: { id: device.id },
+      data: { last_heartbeat_at: new Date() },
+    }).catch((err) => console.error('Failed to touch heartbeat during QR issuance:', err));
+
+    return res.status(200).json({
+      token: tokenResult.token,
+      expires_at: tokenResult.expires_at,
+      ttl: tokenResult.ttl,
+      purpose: device.purpose,
+      device: {
+        id: device.id,
+        device_code: device.device_code,
+        device_name: device.device_name,
+        purpose: device.purpose,
+        gate: tokenResult.record.gate,
+        mess: tokenResult.record.mess,
+      },
+      meal_window: tokenResult.meal_window,
+      next_meal_window: tokenResult.next_meal_window,
+      all_meal_windows: tokenResult.all_meal_windows,
+    });
+  } catch (error) {
+    console.error('getKioskQrToken error:', error);
+    return res.status(500).json({ error: 'Failed to generate QR token' });
+  }
+}

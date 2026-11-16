@@ -160,10 +160,8 @@ export const KioskDisplayPage: React.FC = () => {
     if (saved) {
       setDeviceSecret(saved);
       setSecretInput(saved);
-    } else if (!isAuthenticated) {
-      setShowConfigModal(true);
     }
-  }, [deviceId, storageKey, isAuthenticated]);
+  }, [deviceId, storageKey]);
 
   // Fetch public device info
   const fetchDeviceInfo = useCallback(async () => {
@@ -188,10 +186,6 @@ export const KioskDisplayPage: React.FC = () => {
   // Fetch rotating QR token from backend
   const fetchNextQrToken = useCallback(async () => {
     if (!deviceId) return;
-    if (!deviceSecret && !isAuthenticated) {
-      setShowConfigModal(true);
-      return;
-    }
 
     setIsRotating(true);
     setErrorStatus(null);
@@ -207,8 +201,18 @@ export const KioskDisplayPage: React.FC = () => {
         });
         data = res.data;
       } else {
-        const res = await api.get<QrTokenResponse>(`/devices/${deviceId}/qr-token`);
-        data = res.data;
+        // Try public kiosk display endpoint first, fallback to staff device endpoint if authenticated
+        try {
+          const res = await api.get<QrTokenResponse>(`/display/qr-token/${deviceId}`);
+          data = res.data;
+        } catch (displayErr: any) {
+          if (isAuthenticated) {
+            const res = await api.get<QrTokenResponse>(`/devices/${deviceId}/qr-token`);
+            data = res.data;
+          } else {
+            throw displayErr;
+          }
+        }
       }
 
       setQrToken(data.token);
@@ -263,12 +267,12 @@ export const KioskDisplayPage: React.FC = () => {
     };
   }, [qrToken, showConfigModal, errorStatus, fetchNextQrToken]);
 
-  // Initial trigger when secret is set
+  // Initial trigger on load or when secret changes
   useEffect(() => {
-    if (deviceSecret && deviceId) {
+    if (deviceId) {
       fetchNextQrToken();
     }
-  }, [deviceSecret, deviceId, fetchNextQrToken]);
+  }, [deviceId, deviceSecret, fetchNextQrToken]);
 
   // Socket.IO Setup for real-time connection & anti-proxy confirmation flash
   useEffect(() => {
@@ -280,6 +284,9 @@ export const KioskDisplayPage: React.FC = () => {
     const handleConnect = () => {
       setIsSocketConnected(true);
       socket.emit('join', `device:${deviceId}`);
+      if (deviceInfo?.id && deviceInfo.id !== deviceId) {
+        socket.emit('join', `device:${deviceInfo.id}`);
+      }
     };
 
     const handleDisconnect = () => {
@@ -318,7 +325,14 @@ export const KioskDisplayPage: React.FC = () => {
       socket.off('display:confirm', handleConfirm);
       socket.off('device:force_refresh', handleForceRefresh);
     };
-  }, [deviceId, fetchNextQrToken]);
+  }, [deviceId, deviceInfo?.id, fetchNextQrToken]);
+
+  // Join device UUID room when metadata loads
+  useEffect(() => {
+    if (deviceInfo?.id && socketRef.current?.connected) {
+      socketRef.current.emit('join', `device:${deviceInfo.id}`);
+    }
+  }, [deviceInfo?.id]);
 
   // Handle Fullscreen Toggle
   const toggleFullscreen = () => {

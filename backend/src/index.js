@@ -59,7 +59,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: ["'self'", ...allowedOrigins, 'ws:', 'wss:'],
+        connectSrc: ["'self'", ...allowedOrigins, 'https://*.vercel.app', 'https://*.onrender.com', 'ws:', 'wss:'],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -71,7 +71,14 @@ app.use(
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow non-browser requests (like curl, postman, server-to-server) or matching origins
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.onrender.com') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
       callback(null, true);
     } else {
       callback(new Error(`Origin '${origin}' not allowed by CORS`));

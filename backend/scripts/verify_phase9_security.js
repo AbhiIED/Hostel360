@@ -20,6 +20,7 @@ async function req(url, options = {}) {
       data = null;
     }
   } else {
+    
     data = await res.text();
   }
 

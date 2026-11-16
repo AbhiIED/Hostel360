@@ -495,52 +495,78 @@ export const StudentAppPage: React.FC = () => {
     };
   }, [cameraActive, facingMode]);
 
-  const tickScan = () => {
+  const handleDetectedData = (scannedData: string) => {
+    let extractedToken = scannedData.trim();
+    try {
+      if (extractedToken.startsWith('{') && extractedToken.endsWith('}')) {
+        const parsed = JSON.parse(extractedToken);
+        if (parsed.token) extractedToken = parsed.token;
+      } else if (extractedToken.includes('token=')) {
+        const urlObj = new URL(extractedToken);
+        const tParam = urlObj.searchParams.get('token');
+        if (tParam) extractedToken = tParam;
+      }
+    } catch {
+      // use raw string
+    }
+    submitToken(extractedToken);
+  };
+
+  const tickScan = async () => {
     if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(tickScan);
       return;
     }
 
     const video = videoRef.current;
+
+    // 1. Try Hardware-Accelerated Native BarcodeDetector (instant <10ms on mobile Chrome/Safari)
+    if ('BarcodeDetector' in window) {
+      try {
+        const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+        const barcodes = await barcodeDetector.detect(video);
+        if (barcodes.length > 0 && barcodes[0].rawValue) {
+          handleDetectedData(barcodes[0].rawValue);
+          return;
+        }
+      } catch {
+        // Fallback to optimized jsQR
+      }
+    }
+
+    // 2. High-performance downscaled jsQR fallback (max width 640px)
     let canvas = canvasRef.current;
     if (!canvas) {
       canvas = document.createElement('canvas');
       canvasRef.current = canvas;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Downscale for instant CPU processing (up to 15x faster than 1080p/4K)
+    const maxDim = 640;
+    const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+    const width = Math.round(video.videoWidth * scale);
+    const height = Math.round(video.videoHeight * scale);
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) {
       animationFrameRef.current = requestAnimationFrame(tickScan);
       return;
     }
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height);
 
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
       inversionAttempts: 'dontInvert',
     });
 
     if (code && code.data) {
-      const scannedData = code.data.trim();
-      let extractedToken = scannedData;
-
-      try {
-        if (scannedData.startsWith('{') && scannedData.endsWith('}')) {
-          const parsed = JSON.parse(scannedData);
-          if (parsed.token) extractedToken = parsed.token;
-        } else if (scannedData.includes('token=')) {
-          const urlObj = new URL(scannedData);
-          const tParam = urlObj.searchParams.get('token');
-          if (tParam) extractedToken = tParam;
-        }
-      } catch {
-        // use raw string
-      }
-
-      submitToken(extractedToken);
+      handleDetectedData(code.data);
       return;
     }
 

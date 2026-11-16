@@ -111,6 +111,8 @@ export const KioskDisplayPage: React.FC = () => {
   const socketRef = useRef<Socket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expiresAtMsRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
   const storageKey = `hostel360_device_secret_${deviceId}`;
 
   // Exit navigation handler
@@ -186,7 +188,9 @@ export const KioskDisplayPage: React.FC = () => {
   // Fetch rotating QR token from backend
   const fetchNextQrToken = useCallback(async () => {
     if (!deviceId) return;
+    if (isFetchingRef.current) return;
 
+    isFetchingRef.current = true;
     setIsRotating(true);
     setErrorStatus(null);
 
@@ -221,7 +225,11 @@ export const KioskDisplayPage: React.FC = () => {
       setAllMealWindows(data.all_meal_windows || []);
       const ttl = data.ttl || 20;
       setTtlTotal(ttl);
-      setSecondsLeft(ttl);
+
+      // Deterministic wall-clock expiration calculation
+      const expMs = data.expires_at ? new Date(data.expires_at).getTime() : Date.now() + ttl * 1000;
+      expiresAtMsRef.current = expMs;
+      setSecondsLeft(Math.max(0, Math.ceil((expMs - Date.now()) / 1000)));
 
       if (data.device) {
         setDeviceInfo((prev) => ({
@@ -242,37 +250,38 @@ export const KioskDisplayPage: React.FC = () => {
       }
     } finally {
       setIsRotating(false);
+      isFetchingRef.current = false;
     }
   }, [deviceId, deviceSecret, isAuthenticated]);
 
-  // Countdown timer effect
+  // Robust countdown timer based on actual wall-clock time (never freezes)
   useEffect(() => {
-    if (!qrToken || showConfigModal || errorStatus?.includes('Unauthorized')) return;
+    if (!qrToken || showConfigModal) return;
 
     if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          fetchNextQrToken();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      if (!expiresAtMsRef.current) return;
+      const msLeft = expiresAtMsRef.current - Date.now();
+      const secs = Math.max(0, Math.ceil(msLeft / 1000));
+      setSecondsLeft(secs);
+
+      if (secs <= 0 && !isFetchingRef.current) {
+        fetchNextQrToken();
+      }
+    }, 500);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [qrToken, showConfigModal, errorStatus, fetchNextQrToken]);
+  }, [qrToken, showConfigModal, fetchNextQrToken]);
 
-  // Initial trigger on load or when secret changes
+  // Initial trigger on load
   useEffect(() => {
     if (deviceId) {
       fetchNextQrToken();
     }
-  }, [deviceId, deviceSecret, fetchNextQrToken]);
+  }, [deviceId, fetchNextQrToken]);
 
   // Socket.IO Setup for real-time connection & anti-proxy confirmation flash
   useEffect(() => {
@@ -595,8 +604,8 @@ export const KioskDisplayPage: React.FC = () => {
                     <QRCodeSVG
                       value={qrToken}
                       size={260}
-                      level="H"
-                      includeMargin={false}
+                      level="M"
+                      marginSize={2}
                       className="w-56 h-56 sm:w-64 sm:h-64 transition-opacity duration-300"
                     />
                   </div>
